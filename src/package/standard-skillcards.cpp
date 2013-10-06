@@ -28,20 +28,18 @@ void RendeCard::use(Room *room, ServerPlayer *source, QList<ServerPlayer *> &tar
     ServerPlayer *target = targets.first();
 
     int old_value = source->getMark("rende");
-    if (old_value > 0) {
-        QList<int> rende_list = StringList2IntList(source->property("rende").toString().split("+"));
-        foreach (int id, this->subcards)
-            rende_list.removeOne(id);
-        room->setPlayerProperty(source, "rende", IntList2StringList(rende_list).join("+"));
-    }
-    CardMoveReason reason(CardMoveReason::S_REASON_GIVE, source->objectName());
-    reason.m_playerId = target->objectName();
+    QList<int> rende_list;
+    if (old_value > 0)
+        rende_list = StringList2IntList(source->property("rende").toString().split("+"));
+    else
+        rende_list = source->handCards();
+    foreach (int id, this->subcards)
+        rende_list.removeOne(id);
+    room->setPlayerProperty(source, "rende", IntList2StringList(rende_list).join("+"));
+
+    CardMoveReason reason(CardMoveReason::S_REASON_GIVE, source->objectName(), target->objectName(), "rende", QString());
     room->obtainCard(target, this, reason, false);
 
-    if (old_value == 0 && !source->isKongcheng()) {
-        QList<int> handcards = source->handCards();
-        room->setPlayerProperty(source, "rende", IntList2StringList(handcards).join("+"));
-    }
     int new_value = old_value + subcards.length();
     room->setPlayerMark(source, "rende", new_value);
 
@@ -53,9 +51,9 @@ void RendeCard::use(Room *room, ServerPlayer *source, QList<ServerPlayer *> &tar
     }
 
     if (room->getMode() == "04_1v3" && source->getMark("rende") >= 2) return;
-    if (source->isKongcheng()) return;
+    if (source->isKongcheng() || source->isDead() || rende_list.isEmpty()) return;
     room->addPlayerHistory(source, "RendeCard", -1);
-    if (!room->askForUseCard(source, "@@rende", "@rende-give", -1, Card::MethodUse))
+    if (!room->askForUseCard(source, "@@rende", "@rende-give", -1, Card::MethodNone))
         room->addPlayerHistory(source, "RendeCard");
 }
 
@@ -187,7 +185,10 @@ void LijianCard::use(Room *room, ServerPlayer *, QList<ServerPlayer *> &targets)
     Duel *duel = new Duel(Card::NoSuit, 0);
     duel->setCancelable(duel_cancelable);
     duel->setSkillName(QString("_%1").arg(getSkillName()));
-    room->useCard(CardUseStruct(duel, from, to));
+    if (!from->isCardLimited(duel, Card::MethodUse) && !from->isProhibited(to, duel))
+        room->useCard(CardUseStruct(duel, from, to));
+    else
+        delete duel;
 }
 
 QingnangCard::QingnangCard() {
@@ -230,7 +231,7 @@ bool LiuliCard::targetFilter(const QList<const Player *> &targets, const Player 
         return false;
 
     const Player *from = NULL;
-    foreach (const Player *p, Self->getSiblings()) {
+    foreach (const Player *p, Self->getAliveSiblings()) {
         if (p->hasFlag("LiuliSlashSource")) {
             from = p;
             break;
@@ -245,7 +246,7 @@ bool LiuliCard::targetFilter(const QList<const Player *> &targets, const Player 
     int range_fix = 0;
     if (Self->getWeapon() && Self->getWeapon()->getId() == card_id) {
         const Weapon *weapon = qobject_cast<const Weapon *>(Self->getWeapon()->getRealCard());
-        range_fix += weapon->getRange() - 1;
+        range_fix += weapon->getRange() - Self->getAttackRange(false);
     } else if (Self->getOffensiveHorse() && Self->getOffensiveHorse()->getId() == card_id) {
         range_fix += 1;
     }
@@ -288,7 +289,8 @@ const Card *JijiangCard::validate(CardUseStruct &cardUse) const{
         target->setFlags("JijiangTarget");
     foreach (ServerPlayer *liege, lieges) {
         try {
-            slash = room->askForCard(liege, "slash", "@jijiang-slash:" + liubei->objectName(), QVariant(), Card::MethodResponse, liubei);
+            slash = room->askForCard(liege, "slash", "@jijiang-slash:" + liubei->objectName(),
+                                     QVariant(), Card::MethodResponse, liubei, false, QString(), true);
         }
         catch (TriggerEvent triggerEvent) {
             if (triggerEvent == TurnBroken || triggerEvent == StageChange) {

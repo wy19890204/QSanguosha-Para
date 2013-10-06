@@ -366,6 +366,12 @@ QWidget *ServerDialog::createMiscTab() {
     minimize_dialog_checkbox = new QCheckBox(tr("Minimize the dialog when server runs"));
     minimize_dialog_checkbox->setChecked(Config.EnableMinimizeDialog);
 
+    surrender_at_death_checkbox = new QCheckBox(tr("Surrender at the time of Death"));
+    surrender_at_death_checkbox->setChecked(Config.SurrenderAtDeath);
+
+    luck_card_checkbox = new QCheckBox(tr("Enable the luck card"));
+    luck_card_checkbox->setChecked(Config.EnableLuckCard);
+
     QGroupBox *ai_groupbox = new QGroupBox(tr("Artificial intelligence"));
     ai_groupbox->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
@@ -374,12 +380,6 @@ QWidget *ServerDialog::createMiscTab() {
     ai_enable_checkbox = new QCheckBox(tr("Enable AI"));
     ai_enable_checkbox->setChecked(Config.EnableAI);
     ai_enable_checkbox->setEnabled(false); // Force to enable AI for disabling it causes crashes!!
-
-    role_predictable_checkbox = new QCheckBox(tr("Role predictable"));
-    role_predictable_checkbox->setChecked(Config.value("RolePredictable", false).toBool());
-
-    ai_chat_checkbox = new QCheckBox(tr("AI Chat"));
-    ai_chat_checkbox->setChecked(Config.value("AIChat", true).toBool());
 
     ai_delay_spinbox = new QSpinBox;
     ai_delay_spinbox->setMinimum(0);
@@ -398,16 +398,10 @@ QWidget *ServerDialog::createMiscTab() {
     ai_delay_ad_spinbox->setEnabled(ai_delay_altered_checkbox->isChecked());
     connect(ai_delay_altered_checkbox, SIGNAL(toggled(bool)), ai_delay_ad_spinbox, SLOT(setEnabled(bool)));
 
-    surrender_at_death_checkbox = new QCheckBox(tr("Surrender at the time of Death"));
-    surrender_at_death_checkbox->setChecked(Config.SurrenderAtDeath);
-
     layout->addWidget(ai_enable_checkbox);
-    layout->addWidget(role_predictable_checkbox);
-    layout->addWidget(ai_chat_checkbox);
     layout->addLayout(HLay(new QLabel(tr("AI delay")), ai_delay_spinbox));
     layout->addWidget(ai_delay_altered_checkbox);
     layout->addLayout(HLay(new QLabel(tr("AI delay After Death")), ai_delay_ad_spinbox));
-    layout->addWidget(surrender_at_death_checkbox);
 
     ai_groupbox->setLayout(layout);
 
@@ -415,6 +409,8 @@ QWidget *ServerDialog::createMiscTab() {
     tablayout->addLayout(HLay(new QLabel(tr("Game start count down")), game_start_spinbox));
     tablayout->addLayout(HLay(new QLabel(tr("Nullification count down")), nullification_spinbox));
     tablayout->addWidget(minimize_dialog_checkbox);
+    tablayout->addWidget(surrender_at_death_checkbox);
+    tablayout->addWidget(luck_card_checkbox);
     tablayout->addWidget(ai_groupbox);
     tablayout->addStretch();
 
@@ -621,12 +617,15 @@ QGroupBox *ServerDialog::create1v1Box() {
     QComboBox *officialComboBox = new QComboBox;
     officialComboBox->addItem(tr("Classical"), "Classical");
     officialComboBox->addItem("2013", "2013");
+    officialComboBox->addItem("OL", "OL");
 
     official_1v1_ComboBox = officialComboBox;
 
     QString rule = Config.value("1v1/Rule", "Classical").toString();
     if (rule == "2013")
         officialComboBox->setCurrentIndex(1);
+    else if (rule == "OL")
+        officialComboBox->setCurrentIndex(2);
 
     kof_using_extension_checkbox = new QCheckBox(tr("General extensions"));
     kof_using_extension_checkbox->setChecked(Config.value("1v1/UsingExtension", false).toBool());
@@ -664,7 +663,7 @@ QGroupBox *ServerDialog::create3v3Box() {
 
     official_3v3_ComboBox = officialComboBox;
 
-    QString rule = Config.value("3v3/OfficialRule", "2012").toString();
+    QString rule = Config.value("3v3/OfficialRule", "2013").toString();
     if (rule == "2012")
         officialComboBox->setCurrentIndex(1);
     else if (rule == "2013")
@@ -937,7 +936,7 @@ void Select3v3GeneralDialog::fillTabWidget() {
 void Select3v3GeneralDialog::fillListWidget(QListWidget *list, const Package *pack) {
     QList<const General *> generals = pack->findChildren<const General *>();
     foreach (const General *general, generals) {
-        if (general->isHidden()) continue;
+        if (Sanguosha->isGeneralHidden(general->objectName())) continue;
 
         QListWidgetItem *item = new QListWidgetItem(list);
         item->setData(Qt::UserRole, general->objectName());
@@ -1050,6 +1049,8 @@ bool ServerDialog::config() {
     Config.AlterAIDelayAD = ai_delay_altered_checkbox->isChecked();
     Config.ServerPort = port_edit->text().toInt();
     Config.DisableLua = disable_lua_checkbox->isChecked();
+    Config.SurrenderAtDeath = surrender_at_death_checkbox->isChecked();
+    Config.EnableLuckCard = luck_card_checkbox->isChecked();
 
     // game mode
     QString objname = mode_group->checkedButton()->objectName();
@@ -1093,12 +1094,11 @@ bool ServerDialog::config() {
     Config.setValue("NullificationCountDown", nullification_spinbox->value());
     Config.setValue("EnableMinimizeDialog", Config.EnableMinimizeDialog);
     Config.setValue("EnableAI", Config.EnableAI);
-    Config.setValue("RolePredictable", role_predictable_checkbox->isChecked());
-    Config.setValue("AIChat", ai_chat_checkbox->isChecked());
     Config.setValue("OriginAIDelay", Config.OriginAIDelay);
     Config.setValue("AlterAIDelayAD", ai_delay_altered_checkbox->isChecked());
     Config.setValue("AIDelayAD", Config.AIDelayAD);
-    Config.setValue("SurrenderAtDeath", surrender_at_death_checkbox->isChecked());
+    Config.setValue("SurrenderAtDeath", Config.SurrenderAtDeath);
+    Config.setValue("EnableLuckCard", Config.EnableLuckCard);
     Config.setValue("ServerPort", Config.ServerPort);
     Config.setValue("Address", Config.Address);
     Config.setValue("DisableLua", disable_lua_checkbox->isChecked());
@@ -1144,12 +1144,12 @@ Server::Server(QObject *parent)
 
     //synchronize ServerInfo on the server side to avoid ambiguous usage of Config and ServerInfo
     ServerInfo.parse(Sanguosha->getSetupString());
+
+    current = NULL;
     createNewRoom();
 
     connect(server, SIGNAL(new_connection(ClientSocket *)), this, SLOT(processNewConnection(ClientSocket *)));
     connect(qApp, SIGNAL(aboutToQuit()), this, SLOT(deleteLater()));
-
-    current = NULL;
 }
 
 void Server::broadcast(const QString &msg) {
@@ -1222,14 +1222,14 @@ void Server::processRequest(const char *request) {
     if (command == "signupr") {
         foreach (QString objname, name2objname.values(screen_name)) {
             ServerPlayer *player = players.value(objname);
-            if (player && player->getState() == "offline") {
+            if (player && player->getState() == "offline" && !player->getRoom()->isFinished()) {
                 player->getRoom()->reconnect(player, socket);
                 return;
             }
         }
     }
 
-    if (current == NULL || current->isFull())
+    if (current == NULL || current->isFull() || current->isFinished())
         createNewRoom();
 
     ServerPlayer *player = current->addSocket(socket);
@@ -1256,10 +1256,3 @@ void Server::gameOver() {
         players.remove(player->objectName());
     }
 }
-
-void Server::gamesOver() {
-    name2objname.clear();
-    players.clear();
-    rooms.clear();
-}
-

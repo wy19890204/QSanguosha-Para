@@ -1,8 +1,24 @@
 sgs.ai_skill_invoke.xingshang = true
 
-function SmartAI:toTurnOver(player, n)
+function SmartAI:toTurnOver(player, n, reason)
 	if not player then global_room:writeToConsole(debug.traceback()) return end
 	n = n or 0
+	if self:isEnemy(player) then
+		local manchong = self.room:findPlayerBySkillName("junxing")
+		if manchong and self:isFriend(player, manchong) and self:playerGetRound(manchong) < self:playerGetRound(player)
+			and manchong:faceUp() and not self:willSkipPlayPhase(manchong)
+			and not (manchong:isKongcheng() and self:willSkipDrawPhase(manchong)) then
+			return false
+		end
+	end
+	if reason and reason == "fangzhu" and player:getHp() == 1 and sgs.ai_AOE_data then
+		local use = sgs.ai_AOE_data:toCardUse()
+		if use.to:contains(player) and self:aoeIsEffective(use.card, player)
+			and self:playerGetRound(player) > self:playerGetRound(self.player)
+			and player:isKongcheng() then
+			return false
+		end
+	end
 	if player:hasUsed("ShenfenCard") and player:faceUp() and player:getPhase() == sgs.Player_Play
 		and (not player:hasUsed("ShenfenCard") and player:getMark("@wrath") >= 6 or player:hasFlag("ShenfenUsing")) then
 		return false
@@ -14,7 +30,7 @@ function SmartAI:toTurnOver(player, n)
 	if not player:faceUp() and not player:hasFlag("ShenfenUsing") and not player:hasFlag("GuixinUsing") then
 		return false
 	end
-	if (self:hasSkills("jushou|neojushou|kuiwei", player) and player:getPhase() <= sgs.Player_Finish)
+	if (self:hasSkills("jushou|nosjushou|kuiwei", player) and player:getPhase() <= sgs.Player_Finish)
 		or (player:hasSkill("lihun") and not player:hasUsed("LihunCard") and player:faceUp() and player:getPhase() == sgs.Player_Play) then
 		return false
 	end
@@ -27,7 +43,7 @@ sgs.ai_skill_playerchosen.fangzhu = function(self, targets)
 	local target = nil
 	local n = self.player:getLostHp()
 	for _, friend in ipairs(self.friends_noself) do
-		if not self:toTurnOver(friend, n) then
+		if not self:toTurnOver(friend, n, "fangzhu") then
 			target = friend
 			break
 		end
@@ -38,7 +54,7 @@ sgs.ai_skill_playerchosen.fangzhu = function(self, targets)
 			target = self:findPlayerToDraw(false, n)
 			if not target then
 				for _, enemy in ipairs(self.enemies) do
-					if self:toTurnOver(enemy, n) and enemy:hasSkill("manjuan") and enemy:getPhase() == sgs.Player_NotActive then
+					if self:toTurnOver(enemy, n, "fangzhu") and enemy:hasSkill("manjuan") and enemy:getPhase() == sgs.Player_NotActive then
 						target = enemy
 						break
 					end
@@ -47,14 +63,14 @@ sgs.ai_skill_playerchosen.fangzhu = function(self, targets)
 		else
 			self:sort(self.enemies)
 			for _, enemy in ipairs(self.enemies) do
-				if self:toTurnOver(enemy, n) and enemy:hasSkill("manjuan") and enemy:getPhase() == sgs.Player_NotActive then
+				if self:toTurnOver(enemy, n, "fangzhu") and enemy:hasSkill("manjuan") and enemy:getPhase() == sgs.Player_NotActive then
 					target = enemy
 					break
 				end
 			end
 			if not target then
 				for _, enemy in ipairs(self.enemies) do
-					if self:toTurnOver(enemy, n) and self:hasSkills(sgs.priority_skill, enemy) then
+					if self:toTurnOver(enemy, n, "fangzhu") and self:hasSkills(sgs.priority_skill, enemy) then
 						target = enemy
 						break
 					end
@@ -62,7 +78,7 @@ sgs.ai_skill_playerchosen.fangzhu = function(self, targets)
 			end
 			if not target then
 				for _, enemy in ipairs(self.enemies) do
-					if self:toTurnOver(enemy, n) then
+					if self:toTurnOver(enemy, n, "fangzhu") then
 						target = enemy
 						break
 					end
@@ -70,7 +86,6 @@ sgs.ai_skill_playerchosen.fangzhu = function(self, targets)
 			end
 		end
 	end
-
 	return target
 end
 
@@ -120,7 +135,7 @@ duanliang_skill.getTurnUseCard = function(self)
 	self:sortByUseValue(cards, true)
 
 	for _, acard in ipairs(cards) do
-		if (acard:isBlack()) and (acard:isKindOf("BasicCard") or acard:isKindOf("EquipCard")) and (self:getDynamicUsePriority(acard) < sgs.ai_use_value.SupplyShortage)then
+		if (acard:isBlack()) and (acard:isKindOf("BasicCard") or acard:isKindOf("EquipCard")) and (self:getUsePriority(acard) < sgs.ai_use_value.SupplyShortage)then
 			card = acard
 			break
 		end
@@ -411,7 +426,7 @@ sgs.ai_skill_invoke.haoshi = function(self, data)
 	end
 	local draw_skills = {
 						["yingzi"] = 1, ["zishou"] = self.player:getLostHp(), ["shenwei"] = 2, ["juejing"] = self.player:getLostHp(),
-						["luoyi"] = -1, ["zhaolie"] = -1, ["hongyuan"] = -1
+						["luoyi"] = -1, ["zhaolie"] = -1, ["hongyuan"] = -1, ["dujin"] = math.floor(self.player:getEquips():length() / 2 + 1)
 						}
 	for skill_name, n in ipairs(draw_skills) do
 		if self.player:hasSkill(skill_name) then
@@ -460,10 +475,8 @@ dimeng_skill.getTurnUseCard = function(self)
 	return card
 end
 
-local function DimengDiscard(self, discard_num)
-	local cards = self.player:getCards("he")
+local function DimengDiscard(self, discard_num, cards)
 	local to_discard = {}
-	cards = sgs.QList2Table(cards)
 
 	local aux_func = function(card)
 		local place = self.room:getCardPlace(card:getEffectiveId())
@@ -474,7 +487,7 @@ local function DimengDiscard(self, discard_num)
 			elseif card:isKindOf("DefensiveHorse") then return 3
 			elseif card:isKindOf("Armor") then return 4
 			end
-		elseif self:getUseValue(card) > 7 then return 3
+		elseif self:getUseValue(card) >= 6 then return 3
 		elseif self:hasSkills(sgs.lose_equip_skill) then return 5
 		else return 0
 		end
@@ -496,11 +509,11 @@ local function DimengDiscard(self, discard_num)
 	return to_discard
 end
 
-local function getDimengCard(self, from, to)
+local function getDimengCard(self, from, to, mycards)
 	local num = math.abs(from:getHandcardNum() - to:getHandcardNum())
 	if num == 0 then return sgs.Card_Parse("@DimengCard=.")
 	else
-		local to_discard = DimengDiscard(self, num)
+		local to_discard = DimengDiscard(self, num, mycards)
 		if #to_discard == num then return sgs.Card_Parse("@DimengCard=" .. table.concat(to_discard, "+"))
 		end
 	end
@@ -536,7 +549,7 @@ function DimengIsWorth(self, friend, enemy, mycards, myequips)
 			soKeep = soKeep + 1
 		end
 		local useValue = self:getUseValue(card)
-		if useValue > 7 then
+		if useValue >= 6 then
 			soUse = soUse + 1
 		end
 	end
@@ -553,10 +566,22 @@ sgs.ai_skill_use_func.DimengCard = function(card, use, self)
 	local cardNum = 0
 	local mycards = {}
 	local myequips = {}
+	local keepaslash
 	for _, c in sgs.qlist(self.player:getHandcards()) do
 		if not self.player:isJilei(c) then
-			cardNum = cardNum + 1
-			table.insert(mycards, c)
+			local shouldUse
+			if not keepaslash and isCard("Slash", c, self.player) then
+				local dummy_use = { isDummy = true, to = sgs.SPlayerList() }
+				self:useBasicCard(c, dummy_use)
+				if dummy_use.card and (dummy_use.to:length() > 1 or dummy_use.to:first():getHp() <= 1) then
+					shouldUse = true
+					keepaslash = true
+				end
+			end
+			if not shouldUse then
+				cardNum = cardNum + 1
+				table.insert(mycards, c)
+			end
 		end
 	end
 	for _, c in sgs.qlist(self.player:getEquips()) do
@@ -585,8 +610,8 @@ sgs.ai_skill_use_func.DimengCard = function(card, use, self)
 		for _, enemy in ipairs(self.enemies) do
 			local hand1 = enemy:getHandcardNum()
 
-			if enemy:hasSkill("manjuan") and hand1 > hand2 - 1 and hand1 - hand2 <= cardNum then
-				local dimeng_card = getDimengCard(self, enemy, lowest_friend)
+			if enemy:hasSkill("manjuan") and hand1 > hand2 - 1 and hand1 - hand2 <= cardNum and (hand2 > 0 or hand1 > 0) then
+				local dimeng_card = getDimengCard(self, enemy, lowest_friend, mycards)
 				if dimeng_card then
 					use.card = dimeng_card
 					if use.to then
@@ -601,7 +626,7 @@ sgs.ai_skill_use_func.DimengCard = function(card, use, self)
 			local hand1 = enemy:getHandcardNum()
 
 			if DimengIsWorth(self, lowest_friend, enemy, mycards, myequips) then
-				local dimeng_card = getDimengCard(self, enemy, lowest_friend)
+				local dimeng_card = getDimengCard(self, enemy, lowest_friend, mycards)
 				if dimeng_card then
 					use.card = dimeng_card
 					if use.to then
@@ -686,8 +711,6 @@ end
 sgs.ai_skill_use_func.LuanwuCard = function(card, use, self)
 	use.card = card
 end
-
-sgs.ai_skill_playerchosen.luanwu = sgs.ai_skill_playerchosen.zero_card_as_slash
 
 sgs.dynamic_value.damage_card.LuanwuCard = true
 

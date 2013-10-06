@@ -135,8 +135,6 @@ QString General::getSkillDescription(bool include_name) const{
     QString description;
 
     foreach (const Skill *skill, getVisibleSkillList()) {
-        if (skill->inherits("SPConvertSkill"))
-            continue;
         QString skill_name = Sanguosha->translate(skill->objectName());
         QString desc = skill->getDescription();
         desc.replace("\n", "<br/>");
@@ -144,7 +142,7 @@ QString General::getSkillDescription(bool include_name) const{
     }
 
     if (include_name) {
-        QString color_str = GetConfigFromLuaState(Sanguosha->getLuaState(), ("color_" + kingdom).toAscii()).toString();
+        QString color_str = Sanguosha->getKingdomColor(kingdom).name();
         QString name = QString("<font color=%1><b>%2</b></font>     ").arg(color_str).arg(Sanguosha->translate(objectName()));
         name.prepend(QString("<img src='image/kingdom/icon/%1.png'/>    ").arg(kingdom));
         for (int i = 0; i < max_hp; i++)

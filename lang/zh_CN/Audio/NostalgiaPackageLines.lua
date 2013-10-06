@@ -1,6 +1,10 @@
 -- lines for Nostalgia Package
 
 return {
+	-- 旧 于吉
+	["$nosguhuo1"] = "你信吗？",
+	["$nosguhuo2"] = "猜猜看哪？",
+
 	-- 旧 凌统
 	["cv:nos_lingtong"] = "官方",
 	["$nosxuanfeng1"] = "伤敌于千里之外！",
@@ -17,6 +21,7 @@ return {
 	["$nosgongqi"] = "弓马齐备，远射近突！",
 	["$nosjiefan1"] = "解烦军至，此危自解！",
 	["$nosjiefan2"] = "吾主莫慌，韩义公在此！",
+	["~nos_handang"] = "我主堪忧，我主堪忧啊……",
 
 	-- 旧 马岱
 	["cv:nos_madai"] = "风叹息",

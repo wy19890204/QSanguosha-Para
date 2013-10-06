@@ -19,15 +19,15 @@ function askForShowGeneral(self, choices)
 		local effect = data:toCardEffect()
 		for _, player in ipairs(players) do
 			if self.room:isProhibited(effect.from, player, effect.card) and self:isEnemy(effect.from, effect.to) then return "yes" end
-			if self:hasSkills("xiangle", player) and effect.card:isKindOf("Slash") then return "yes" end
-			if self:hasSkills("jiang", player) and ((effect.card:isKindOf("Slash") and effect.card:isRed()) or effect.card:isKindOf("Duel")) then return "yes" end
-			if self:hasSkills("tuntian", player) then return "yes" end
+			if player:hasSkill("xiangle") and effect.card:isKindOf("Slash") then return "yes" end
+			if player:hasSkill("jiang") and ((effect.card:isKindOf("Slash") and effect.card:isRed()) or effect.card:isKindOf("Duel")) then return "yes" end
+			if player:hasSkill("tuntian") then return "yes" end
 		end
 	end
 
 	if self.room:alivePlayerCount() <= 3 then return "yes" end
 	if sgs.getValue(self.player) < 6 then return "no" end
-	local skills_to_show = "bazhen|yizhong|zaiqi|feiying|buqu|kuanggu|guanxing|luoshen|tuxi|zhiheng|qiaobian|longdan|liuli|longhun|shelie|luoying|anxian|yicong|wushuang|jueqing|niepan"
+	local skills_to_show = "bazhen|yizhong|zaiqi|feiying|buqu|kuanggu|kofkuanggu|guanxing|luoshen|tuxi|zhiheng|qiaobian|longdan|liuli|longhun|shelie|luoying|anxian|yicong|wushuang|jueqing|niepan"
 	for _, player in ipairs(players) do
 		if self:hasSkills(skills_to_show, player) then return "yes" end
 	end

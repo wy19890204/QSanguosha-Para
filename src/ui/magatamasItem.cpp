@@ -1,7 +1,6 @@
 #include <magatamasItem.h>
 #include <QPropertyAnimation>
 #include <QParallelAnimationGroup>
-#include <sprite.h>
 #include "SkinBank.h"
 
 MagatamasBoxItem::MagatamasBoxItem()
@@ -106,6 +105,7 @@ void MagatamasBoxItem::update() {
     QGraphicsItem::update();
 }
 
+#include "sprite.h"
 void MagatamasBoxItem::_doHpChangeAnimation(int newHp) {
     if (newHp >= m_hp) return;
 
@@ -120,8 +120,13 @@ void MagatamasBoxItem::_doHpChangeAnimation(int newHp) {
         yStep = height;
     }
 
-    for (int i = newHp; i < m_hp; i++) {
-        Sprite *aniMaga = new Sprite();
+    int mHp = m_hp;
+    if (m_hp < 0) {
+        newHp -= m_hp;
+        mHp = 0;
+    }
+    for (int i = qMax(newHp, mHp - 10); i < mHp; i++) {
+        Sprite *aniMaga = new Sprite;
         aniMaga->setPixmap(_icons[qBound(0, i, 5)]);
         aniMaga->setParentItem(this);
         aniMaga->setOffset(QPoint(-(width - m_imageArea.left()) / 2, -(height - m_imageArea.top()) / 2));

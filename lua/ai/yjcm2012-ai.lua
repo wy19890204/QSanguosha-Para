@@ -1,4 +1,18 @@
 sgs.ai_skill_invoke.qianxi = function(self, data)
+	if self.player:getPile("incantation"):length() > 0 then
+		local card = sgs.Sanguosha:getCard(self.player:getPile("incantation"):first())
+		if not self.player:getJudgingArea():isEmpty() and not self.player:containsTrick("YanxiaoCard") and not self:hasWizard(self.enemies, true) then
+			local trick = self.player:getJudgingArea():last()
+			if trick:isKindOf("Indulgence") then
+				if card:getSuit() == sgs.Card_Heart or (self.player:hasSkill("hongyan") and card:getSuit() == sgs.Card_Spade) then return false end
+			elseif trick:isKindOf("SupplyShortage") then
+				if card:getSuit() == sgs.Card_Club then return false end
+			end
+		end
+		local zhangbao = self.room:findPlayerBySkillName("yingbing")
+		if zhangbao and self:isEnemy(zhangbao) and not zhangbao:hasSkill("manjuan")
+			and (card:isRed() or (self.player:hasSkill("hongyan") and card:getSuit() == sgs.Card_Spade)) then return false end
+	end
  	for _, p in ipairs(self.enemies) do
 		if self.player:distanceTo(p) == 1 and not p:isKongcheng() then
 			return true
@@ -117,7 +131,7 @@ function sgs.ai_skill_invoke.zhenlie(self, data)
 				or self:getCardsNum("Jink") < jink_num
 				or (use.from:hasSkill("dahe") and self.player:hasFlag("dahe") and not hasHeart) then
 
-				if self.player:isChained() and not self:isGoodChainTarget(self.player) and use.card:isKindOf("NatureSlash") then return true end
+				if use.card:isKindOf("NatureSlash") and self.player:isChained() and not self:isGoodChainTarget(self.player, nil, nil, nil, use.card) then return true end
 				if use.from:hasSkill("nosqianxi") and use.from:distanceTo(self.player) == 1 then return true end
 				if self:isFriend(use.from) and self.role == "loyalist" and not use.from:hasSkill("jueqing") and use.from:isLord() and self.player:getHp() == 1 then return true end
 				if (not (self:hasSkills(sgs.masochism_skill) or (self.player:hasSkill("tianxiang") and getKnownCard(self.player, "heart") > 0)) or use.from:hasSkill("jueqing"))
@@ -262,7 +276,7 @@ sgs.ai_skill_choice.jiangchi = function(self, choices)
 	if goodtarget == 0 or self.player:isSkipped(sgs.Player_Play) then return "jiang" end
 
 	for _, enemy in ipairs(self.enemies) do
-		local def = sgs.getDefenseSlash(enemy)
+		local def = sgs.getDefenseSlash(enemy, self)
 		local slash = sgs.Sanguosha:cloneCard("slash")
 		local eff = self:slashIsEffective(slash, enemy) and sgs.isGoodTarget(enemy, self.enemies, self)
 
@@ -375,7 +389,7 @@ sgs.ai_skill_use_func.JiefanCard = function(card, use, self)
 	local max_value = -10000
 	for _, friend in ipairs(self.friends) do
 		use_value = 0
-		for _, p in sgs.qlist(self.room:getAllPlayers()) do
+		for _, p in sgs.qlist(self.room:getOtherPlayers(friend)) do
 			if p:inMyAttackRange(friend) then
 				if self:isFriend(p) then
 					if not friend:hasSkill("manjuan") then use_value = use_value + 1 end
@@ -412,7 +426,7 @@ sgs.ai_skill_cardask["@jiefan-discard"] = function(self, data)
 
 	if not self.player:getWeapon() then return "." end
 	local count = 0
-	local range_fix = sgs.weapon_range[self.player:getWeapon():getClassName()] - 1
+	local range_fix = sgs.weapon_range[self.player:getWeapon():getClassName()] - self.player:getAttackRange(false)
 
 	for _, p in sgs.qlist(self.room:getAllPlayers()) do
 		if self:isEnemy(p) and self.player:distanceTo(p, range_fix) > self.player:getAttackRange() then count = count + 1 end
@@ -438,10 +452,10 @@ sgs.ai_skill_use_func.AnxuCard = function(card, use, self)
 	local friends = {}
 	for _, friend in ipairs(self.friends_noself) do
 		if friend:hasSkill("manjuan") then
-			if friend:hasSkill("kongcheng") and friend:isKongcheng() then
+			if self:needKongcheng(friend, true) then
 				table.insert(friends, friend)
 			end
-		elseif not (friend:hasSkill("kongcheng") and friend:isKongcheng()) then
+		elseif not self:needKongcheng(friend, true) then
 			table.insert(friends, friend)
 		end
 	end
@@ -638,7 +652,8 @@ sgs.ai_view_as.lihuo = function(card, player, card_place)
 	local suit = card:getSuitString()
 	local number = card:getNumberString()
 	local card_id = card:getEffectiveId()
-	if card_place ~= sgs.Player_PlaceSpecial and card:objectName() == "slash" then
+	if sgs.Sanguosha:getCurrentCardUseReason() ~= sgs.CardUseStruct_CARD_USE_REASON_RESPONSE
+		and card_place ~= sgs.Player_PlaceSpecial and card:objectName() == "slash" then
 		return ("fire_slash:lihuo[%s:%s]=%d"):format(suit, number, card_id)
 	end
 end
@@ -707,7 +722,7 @@ function sgs.ai_cardsview_valuable.chunlao(self, class_name, player)
 		local dying = player:getRoom():getCurrentDyingPlayer()
 		if dying then
 			local anal = sgs.Sanguosha:cloneCard("analeptic")
-			if dying:isCardLimited(anal, sgs.Card_MethodUse) then return nil end
+			if dying:isLocked(anal) then return nil end
 			return "@ChunlaoWineCard=."
 		end
 	end

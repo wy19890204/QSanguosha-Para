@@ -63,10 +63,11 @@ void Settings::init() {
     QStringList banpackagelist = value("BanPackages").toStringList();
     if (banpackagelist.isEmpty()) {
         banpackagelist << "nostalgia"
-                       << "nostal_standard" << "nostal_general" << "nostal_yjcm" << "nostal_yjcm2012"
+                       << "nostal_standard" << "nostal_general" << "nostal_wind"
+                       << "nostal_yjcm" << "nostal_yjcm2012"
                        << "test" << "GreenHand" << "dragon"
-                       << "sp_cards" << "ling" << "GreenHandCard"
-                       << "New3v3Card" << "New3v3_2013Card";
+                       << "sp_cards" << "Special1v1OL" << "GreenHandCard"
+                       << "New3v3Card" << "New3v3_2013Card" << "New1v1Card";
     }
     setValue("BanPackages", banpackagelist);
 
@@ -91,6 +92,7 @@ void Settings::init() {
     AlterAIDelayAD = value("AlterAIDelayAD", false).toBool();
     AIDelayAD = value("AIDelayAD", 0).toInt();
     SurrenderAtDeath = value("SurrenderAtDeath", false).toBool();
+    EnableLuckCard = value("EnableLuckCard", false).toBool();
     ServerPort = value("ServerPort", 9527u).toUInt();
     DisableLua = value("DisableLua", false).toBool();
 
@@ -199,8 +201,11 @@ void Settings::init() {
 
     QStringList forbid_packages = value("ForbidPackages").toStringList();
     if (forbid_packages.isEmpty()) {
-        forbid_packages << "New3v3Card" << "New3v3_2013Card" << "test";
+        forbid_packages << "New3v3Card" << "New3v3_2013Card" << "New1v1Card" << "test";
 
         setValue("ForbidPackages", forbid_packages);
     }
+
+    Config.ExtraHiddenGenerals = GetConfigFromLuaState(lua, "extra_hidden_generals").toStringList();
+    Config.RemovedHiddenGenerals = GetConfigFromLuaState(lua, "removed_hidden_generals").toStringList();
 }

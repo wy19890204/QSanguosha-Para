@@ -4,6 +4,7 @@
 #include "uiUtils.h"
 #include "engine.h"
 #include "settings.h"
+#include "clientstruct.h"
 #include <fstream>
 #include <QGraphicsPixmapItem>
 #include <QTextItem>
@@ -35,7 +36,7 @@ const char *QSanRoomSkin::S_SKIN_KEY_MAINFRAME = "%1MainFrame";
 const char *QSanRoomSkin::S_SKIN_KEY_LEFTFRAME = "%1LeftFrame";
 const char *QSanRoomSkin::S_SKIN_KEY_RIGHTFRAME = "%1RightFrame";
 const char *QSanRoomSkin::S_SKIN_KEY_MIDDLEFRAME = "%1MiddleFrame";
-const char *QSanRoomSkin::S_SKIN_KEY_HANDCARDNUM = "%1HandCardNum";
+const char *QSanRoomSkin::S_SKIN_KEY_HANDCARDNUM = "%1HandCardNum-%2";
 const char *QSanRoomSkin::S_SKIN_KEY_FACETURNEDMASK = "%1FaceTurnedMask";
 const char *QSanRoomSkin::S_SKIN_KEY_BLANK_GENERAL = "%1BlankGeneral";
 const char *QSanRoomSkin::S_SKIN_KEY_EXTRA_SKILL_BG = "%1ExtraSkillBg";
@@ -48,7 +49,6 @@ const char *QSanRoomSkin::S_SKIN_KEY_KINGDOM_COLOR_MASK = "kingdomColorMask-%1";
 const char *QSanRoomSkin::S_SKIN_KEY_VOTES_NUMBER = "votesNum-%1";
 const char *QSanRoomSkin::S_SKIN_KEY_SAVE_ME_ICON = "saveMe";
 const char *QSanRoomSkin::S_SKIN_KEY_ACTIONED_ICON = "playerActioned";
-const char *QSanRoomSkin::S_SKIN_KEY_READY_ICON = "playerReady";
 const char *QSanRoomSkin::S_SKIN_KEY_HAND_CARD_BACK = "handCardBack";
 const char *QSanRoomSkin::S_SKIN_KEY_HAND_CARD_SUIT = "handCardSuit-%1";
 const char *QSanRoomSkin::S_SKIN_KEY_JUDGE_CARD_ICON = "judgeCardIcon-%1";
@@ -258,7 +258,12 @@ QPixmap QSanRoomSkin::getProgressBarPixmap(int percentile) const{
 
 QPixmap QSanRoomSkin::getCardMainPixmap(const QString &cardName) const{
     if (cardName == "unknown") return getPixmap("handCardBack");
-    return getPixmap(S_SKIN_KEY_HAND_CARD_MAIN_PHOTO, cardName);
+    QString name = cardName;
+    if (ServerInfo.GameMode == "06_3v3" && name.startsWith("vs_"))
+        name = name.mid(3);
+    else if (ServerInfo.GameMode == "02_1v1" && name.startsWith("kof_"))
+        name = name.mid(4);
+    return getPixmap(S_SKIN_KEY_HAND_CARD_MAIN_PHOTO, name);
 }
 
 QPixmap QSanRoomSkin::getCardSuitPixmap(Card::Suit suit) const{
@@ -275,19 +280,29 @@ QPixmap QSanRoomSkin::getCardJudgeIconPixmap(const QString &judgeName) const{
 }
 
 QPixmap QSanRoomSkin::getCardAvatarPixmap(const QString &generalName) const{
-    return getGeneralPixmap(generalName, S_GENERAL_ICON_SIZE_TINY);
+    QString name = generalName;
+    if (ServerInfo.GameMode == "06_3v3" && name.startsWith("vs_"))
+        name = name.mid(3);
+    else if (ServerInfo.GameMode == "02_1v1" && name.startsWith("kof_"))
+        name = name.mid(4);
+    return getGeneralPixmap(name, S_GENERAL_ICON_SIZE_TINY);
 }
 
 QPixmap QSanRoomSkin::getGeneralPixmap(const QString &generalName, GeneralIconSize size) const{
+    QString name = generalName;
+    if (ServerInfo.GameMode == "06_3v3" && name.startsWith("vs_"))
+        name = name.mid(3);
+    else if (ServerInfo.GameMode == "02_1v1" && name.startsWith("kof_"))
+        name = name.mid(4);
     if (size == S_GENERAL_ICON_SIZE_CARD)
-        return getCardMainPixmap(generalName);
+        return getCardMainPixmap(name);
     else {
-        QString key = QString(S_SKIN_KEY_PLAYER_GENERAL_ICON).arg(size).arg(generalName);
+        QString key = QString(S_SKIN_KEY_PLAYER_GENERAL_ICON).arg(size).arg(name);
         if (isImageKeyDefined(key))
             return getPixmap(key);
         else {
             key = QString(S_SKIN_KEY_PLAYER_GENERAL_ICON).arg(size);
-            return getPixmap(key, generalName);
+            return getPixmap(key, name);
         }
     }
 }
@@ -855,7 +870,6 @@ bool QSanRoomSkin::_loadLayoutConfig(const Json::Value &layoutConfig) {
         tryParse(playerConfig["actionedIconRegion"], layout->m_actionedIconRegion);
         tryParse(playerConfig["saveMeIconRegion"], layout->m_saveMeIconRegion);
         tryParse(playerConfig["chainedIconRegion"], layout->m_chainedIconRegion);
-        tryParse(playerConfig["readyIconRegion"], layout->m_readyIconRegion);
         layout->m_deathIconRegion.tryParse(playerConfig["deathIconRegion"]);
         tryParse(playerConfig["votesIconRegion"], layout->m_votesIconRegion);
         tryParse(playerConfig["drankMaskColor"], layout->m_drankMaskColor);
@@ -948,11 +962,11 @@ bool QSanSkinScheme::load(Json::Value configs) {
     return _m_roomSkin.load(layoutFile, imageFile, audioFile, animFile);
 }
 
-const QSanRoomSkin& QSanSkinScheme::getRoomSkin() const{
+const QSanRoomSkin &QSanSkinScheme::getRoomSkin() const{
     return _m_roomSkin;
 }
 
-QSanSkinFactory& QSanSkinFactory::getInstance() {
+QSanSkinFactory &QSanSkinFactory::getInstance() {
     if (_sm_singleton == NULL)
         _sm_singleton = new QSanSkinFactory("skins/skinList.json");
     return *_sm_singleton;

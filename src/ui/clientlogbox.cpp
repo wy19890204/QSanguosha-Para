@@ -15,6 +15,8 @@ ClientLogBox::ClientLogBox(QWidget *parent)
 
 void ClientLogBox::appendLog(const QString &type, const QString &from_general, const QStringList &tos,
                              QString card_str, QString arg, QString arg2) {
+    if (Self->hasFlag("marshalling")) return;
+
     if (type == "$AppendSeparator") {
         append(QString(tr("<font color='%1'>------------------------------</font>")).arg(Config.TextEditColor.name()));
         return;
@@ -112,14 +114,14 @@ void ClientLogBox::appendLog(const QString &type, const QString &from_general, c
                 else
                     log = tr("%from %3 [%1] %4, and the cost is %2").arg(skill_name).arg(subcard_str).arg(meth).arg(suffix);
             } else {
-                if (subcard_list.isEmpty() || card->getSkillName() == "guhuo")
+                if (subcard_list.isEmpty() || card->getSkillName().contains("guhuo"))
                     log = tr("%from %4 [%1] %5, %3 [%2]").arg(skill_name).arg(card_name).arg(reason).arg(meth).arg(suffix);
                 else
                     log = tr("%from %5 [%1] %6 %4 %2 as %3").arg(skill_name).arg(subcard_str).arg(card_name).arg(reason).arg(meth).arg(suffix);
             }
 
             delete card;
-        } else if (card->isModified() && card->getSkillName() != QString()) {
+        } else if (card->getSkillName() != QString()) {
             const Card *real = Sanguosha->getEngineCard(card->getEffectiveId());
             QString skill_name = Sanguosha->translate(card->getSkillName());
             skill_name = bold(skill_name, Qt::yellow);

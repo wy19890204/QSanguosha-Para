@@ -237,6 +237,7 @@ void Dashboard::_addHandCard(CardItem *card_item) {
     m_handCards << card_item;
 
     connect(card_item, SIGNAL(clicked()), this, SLOT(onCardItemClicked()));
+    connect(card_item, SIGNAL(double_clicked()), this, SLOT(onCardItemDoubleClicked()));
     connect(card_item, SIGNAL(thrown()), this, SLOT(onCardItemThrown()));
     connect(card_item, SIGNAL(enter_hover()), this, SLOT(onCardItemHover()));
     connect(card_item, SIGNAL(leave_hover()), this, SLOT(onCardItemLeaveHover()));      
@@ -511,9 +512,6 @@ void Dashboard::selectAll() {
 
 void Dashboard::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *) {
     painter->setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
-}
-
-void Dashboard::mousePressEvent(QGraphicsSceneMouseEvent *) {
 }
 
 void Dashboard::mouseReleaseEvent(QGraphicsSceneMouseEvent *mouseEvent) {
@@ -812,6 +810,11 @@ void Dashboard::reverseSelection() {
 
 void Dashboard::cancelNullification() {
     ClientInstance->m_noNullificationThisTime = !ClientInstance->m_noNullificationThisTime;
+    if (Sanguosha->getCurrentCardUseReason() == CardUseStruct::CARD_USE_REASON_RESPONSE_USE
+        && Sanguosha->getCurrentCardUsePattern() == "nullification"
+        && RoomSceneInstance->isCancelButtonEnabled()) {
+        RoomSceneInstance->doCancelButton();
+    }
 }
 
 void Dashboard::controlNullificationButton(bool show) {
@@ -858,7 +861,7 @@ void Dashboard::startPending(const ViewAsSkill *skill) {
 
 void Dashboard::stopPending() {
     m_mutexEnableCards.lock();
-    if (view_as_skill && view_as_skill->objectName() == "guhuo") {
+    if (view_as_skill && view_as_skill->objectName().contains("guhuo")) {
         foreach (CardItem *item, m_handCards)
             item->hideFootnote();
     }
@@ -951,12 +954,12 @@ void Dashboard::updatePending() {
             delete pending_card;
             pending_card = NULL;
         }
-        if (view_as_skill->objectName() == "guhuo"
+        if (view_as_skill->objectName().contains("guhuo")
             && Sanguosha->currentRoomState()->getCurrentCardUseReason() == CardUseStruct::CARD_USE_REASON_PLAY) {
             foreach (CardItem *item, m_handCards) {
                 item->hideFootnote();
                 if (new_pending_card && item->getCard() == cards.first()) {
-                    const GuhuoCard *guhuo = qobject_cast<const GuhuoCard *>(new_pending_card);
+                    const SkillCard *guhuo = qobject_cast<const SkillCard *>(new_pending_card);
                     item->setFootnote(Sanguosha->translate(guhuo->getUserString()));
                     item->showFootnote();
                 }
@@ -964,6 +967,15 @@ void Dashboard::updatePending() {
         }
         pending_card = new_pending_card;
         emit card_selected(pending_card);
+    }
+}
+
+void Dashboard::onCardItemDoubleClicked() {
+    CardItem *card_item = qobject_cast<CardItem *>(sender());
+    if (card_item) {
+        if (!view_as_skill) selected = card_item;
+        animations->effectOut(card_item);
+        emit card_to_use();
     }
 }
 
