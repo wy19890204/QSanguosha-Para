@@ -12,7 +12,7 @@ public:
     virtual CardType getTypeId() const;
 };
 
-class TrickCard:public Card {
+class TrickCard: public Card {
 public:
     TrickCard(Suit suit, int number);
     void setCancelable(bool cancelable);
@@ -52,12 +52,19 @@ public:
     virtual void onUninstall(ServerPlayer *player) const;
 
     virtual Location location() const = 0;
-
-protected:
-    TriggerSkill *skill;
 };
 
-class Weapon:public EquipCard {
+%extend EquipCard {
+    void equipOnInstall(ServerPlayer *player) const{
+        $self->EquipCard::onInstall(player);
+    }
+
+    void equipOnUninstall(ServerPlayer *player) const{
+        $self->EquipCard::onUninstall(player);
+    }
+};
+
+class Weapon: public EquipCard {
 public:
     Weapon(Suit suit, int number, int range);
     int getRange();
@@ -110,7 +117,8 @@ public:
     DamageStruct::Nature getNature() const;
     void setNature(DamageStruct::Nature nature);
 
-    static bool IsAvailable(const Player *player, const Card *slash = NULL);
+    static bool IsAvailable(const Player *player, const Card *slash = NULL, bool considerSpecificAssignee = true);
+    static bool IsSpecificAssignee(const Player *player, const Player *from, const Card *slash);
     
 protected:
     DamageStruct::Nature nature;

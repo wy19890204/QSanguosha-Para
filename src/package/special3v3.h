@@ -50,16 +50,8 @@ class VSCrossbow: public Crossbow {
 
 public:
     Q_INVOKABLE VSCrossbow(Card::Suit suit, int number = 1);
-};
 
-class Drowning: public SingleTargetTrick {
-    Q_OBJECT
-
-public:
-    Q_INVOKABLE Drowning(Card::Suit suit, int number);
-
-    virtual bool targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const;
-    virtual void onEffect(const CardEffectStruct &effect) const;
+    virtual bool match(const QString &pattern) const;
 };
 
 class Special3v3Package: public Package {
@@ -67,13 +59,6 @@ class Special3v3Package: public Package {
 
 public:
     Special3v3Package();
-};
-
-class Special3v3_2013Package: public Package {
-    Q_OBJECT
-
-public:
-    Special3v3_2013Package();
 };
 
 class New3v3CardPackage: public Package {

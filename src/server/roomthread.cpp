@@ -46,12 +46,12 @@ Json::Value LogMessage::toJsonValue() const{
 }
 
 DamageStruct::DamageStruct()
-    : from(NULL), to(NULL), card(NULL), damage(1), nature(Normal), chain(false), transfer(false), reason(QString())
+    : from(NULL), to(NULL), card(NULL), damage(1), nature(Normal), chain(false), transfer(false), by_user(true), reason(QString())
 {
 }
 
 DamageStruct::DamageStruct(const Card *card, ServerPlayer *from, ServerPlayer *to, int damage, DamageStruct::Nature nature)
-    : chain(false), transfer(false), reason(QString())
+    : chain(false), transfer(false), by_user(true), reason(QString())
 {
     this->card = card;
     this->from = from;
@@ -61,7 +61,7 @@ DamageStruct::DamageStruct(const Card *card, ServerPlayer *from, ServerPlayer *t
 }
 
 DamageStruct::DamageStruct(const QString &reason, ServerPlayer *from, ServerPlayer *to, int damage, DamageStruct::Nature nature)
-    : card(NULL), chain(false), transfer(false)
+    : card(NULL), chain(false), transfer(false), by_user(true)
 {
     this->from = from;
     this->to = to;
@@ -112,54 +112,18 @@ bool PindianStruct::isSuccess() const{
     return success;
 }
 
-JudgeStructPattern::JudgeStructPattern() {
-}
-
-bool JudgeStructPattern::match(const Player *player, const Card *card) const{
-    if (pattern.isEmpty())
-        return false;
-
-    if (isRegex) {
-        QString class_name = card->getClassName();
-        Card::Suit suit = card->getSuit();
-
-        QString number = card->getNumberString();
-        QString card_str = QString("%1:%2:%3").arg(class_name).arg(Card::Suit2String(suit)).arg(number);
-
-        return QRegExp(pattern).exactMatch(card_str);
-    } else {
-        const CardPattern *card_pattern = Sanguosha->getPattern(pattern);
-        return card_pattern && card_pattern->match(player, card);
-    }
-}
-
-JudgeStructPattern &JudgeStructPattern::operator =(const QRegExp &rx) {
-    pattern = rx.pattern();
-    isRegex = true;
-
-    return *this;
-}
-
-JudgeStructPattern &JudgeStructPattern::operator =(const QString &str) {
-    pattern = str;
-    isRegex = false;
-
-    return *this;
-}
-
-// members should be initilized the same order as defined
 JudgeStruct::JudgeStruct()
-    : who(NULL), card(NULL), good(true), time_consuming(false),
+    : who(NULL), card(NULL), pattern("."), good(true), time_consuming(false),
       negative(false), play_animation(true), _m_result(TRIAL_RESULT_UNKNOWN)
 {
 }
 
-bool JudgeStruct::isEffected() {
+bool JudgeStruct::isEffected() const{
     return negative ? isBad() : isGood();
 }
 
 void JudgeStruct::updateResult() {
-    bool effected = (good == pattern.match(who, card));
+    bool effected = (good == ExpPattern(pattern).match(who, card));
     if (effected)
         _m_result = TRIAL_RESULT_GOOD;
     else
@@ -171,13 +135,13 @@ bool JudgeStruct::isGood() const{
     return _m_result == TRIAL_RESULT_GOOD;
 }
 
-bool JudgeStruct::isGood(const Card *card) const{
-    Q_ASSERT(card);
-    return good == pattern.match(who, card);
-}
-
 bool JudgeStruct::isBad() const{
     return !isGood();
+}
+
+bool JudgeStruct::isGood(const Card *card) const{
+    Q_ASSERT(card);
+    return (good == ExpPattern(pattern).match(who, card));
 }
 
 PhaseChangeStruct::PhaseChangeStruct()
@@ -298,10 +262,6 @@ RoomThread::RoomThread(Room *room)
 {
 }
 
-void RoomThread::resetRoomState() {
-    room->getRoomState()->reset();
-}
-
 void RoomThread::addPlayerSkills(ServerPlayer *player, bool invoke_game_start) {
     QVariant void_data;
     bool invoke_verify = false;
@@ -324,9 +284,27 @@ void RoomThread::constructTriggerTable() {
 }
 
 ServerPlayer *RoomThread::find3v3Next(QList<ServerPlayer *> &first, QList<ServerPlayer *> &second) {
+    bool all_actioned = true;
+    foreach (ServerPlayer *player, room->m_alivePlayers) {
+        if (!player->hasFlag("actioned")) {
+            all_actioned = false;
+            break;
+        }
+    }
+
+    if (all_actioned) {
+        foreach (ServerPlayer *player, room->m_alivePlayers) {
+            room->setPlayerFlag(player, "-actioned");
+            trigger(ActionedReset, room, player);
+        }
+
+        qSwap(first, second);
+        return room->askForPlayerChosen(first.first(), first, "3v3-action", "@3v3-action");
+    }
+
     ServerPlayer *current = room->getCurrent();
     if (current != first.first()) {
-        ServerPlayer *another;
+        ServerPlayer *another = NULL;
         if (current == first.last())
             another = first.at(1);
         else
@@ -351,59 +329,39 @@ ServerPlayer *RoomThread::find3v3Next(QList<ServerPlayer *> &first, QList<Server
 void RoomThread::run3v3(QList<ServerPlayer *> &first, QList<ServerPlayer *> &second, GameRule *game_rule, ServerPlayer *current) {
     try {
         forever {
-            action3v3(current);
+            room->setCurrent(current);
+            trigger(TurnStart, room, room->getCurrent());
+            room->setPlayerFlag(current, "actioned");
             current = find3v3Next(first, second);
         }
     }
     catch (TriggerEvent triggerEvent) {
-        if (triggerEvent == TurnBroken) {
-            ServerPlayer *player = room->getCurrent();
-            if (player->getPhase() != Player::NotActive) {
-                game_rule->trigger(EventPhaseEnd, room, player, QVariant());
-                player->changePhase(player->getPhase(), Player::NotActive);
-            }
-            if (!player->hasFlag("actioned"))
-                room->setPlayerFlag(player, "actioned");
-
-            bool all_actioned = true;
-            foreach (ServerPlayer *player, room->m_alivePlayers) {
-                if (!player->hasFlag("actioned")) {
-                    all_actioned = false;
-                    break;
-                }
-            }
-
-            if (all_actioned) {
-                foreach (ServerPlayer *player, room->m_alivePlayers) {
-                    room->setPlayerFlag(player, "-actioned");
-                    trigger(ActionedReset, room, player);
-                }
-            }
-
-            run3v3(first, second, game_rule, find3v3Next(first, second));
-        } else {
+        if (triggerEvent == TurnBroken)
+            _handleTurnBroken3v3(first, second, game_rule);
+        else
             throw triggerEvent;
-        }
     }
 }
 
-void RoomThread::action3v3(ServerPlayer *player) {
-    room->setCurrent(player);
-    trigger(TurnStart, room, room->getCurrent());
-    room->setPlayerFlag(player, "actioned");
-
-    bool all_actioned = true;
-    foreach (ServerPlayer *player, room->m_alivePlayers) {
-        if (!player->hasFlag("actioned")) {
-            all_actioned = false;
-            break;
+void RoomThread::_handleTurnBroken3v3(QList<ServerPlayer *> &first, QList<ServerPlayer *> &second, GameRule *game_rule) {
+    try {
+        ServerPlayer *player = room->getCurrent();
+        trigger(TurnBroken, room, player);
+        if (player->getPhase() != Player::NotActive) {
+            game_rule->trigger(EventPhaseEnd, room, player, QVariant());
+            player->changePhase(player->getPhase(), Player::NotActive);
         }
-    }
+        if (!player->hasFlag("actioned"))
+            room->setPlayerFlag(player, "actioned");
 
-    if (all_actioned) {
-        foreach (ServerPlayer *player, room->m_alivePlayers) {
-            room->setPlayerFlag(player, "-actioned");
-            trigger(ActionedReset, room, player);
+        ServerPlayer *next = find3v3Next(first, second);
+        run3v3(first, second, game_rule, next);
+    }
+    catch (TriggerEvent triggerEvent) {
+        if (triggerEvent == TurnBroken) {
+            _handleTurnBroken3v3(first, second, game_rule);
+        } else {
+            throw triggerEvent;
         }
     }
 }
@@ -485,7 +443,7 @@ void RoomThread::actionHulaoPass(ServerPlayer *shenlvbu, QList<ServerPlayer *> l
     catch (TriggerEvent triggerEvent) {
         if (triggerEvent == StageChange) {
             stage = 2;
-            trigger(triggerEvent, (Room *)room, NULL);
+            trigger(triggerEvent, room, NULL);
             foreach (ServerPlayer *player, room->getPlayers()) {
                 if (player != shenlvbu) {
                     if (player->hasFlag("actioned"))
@@ -501,20 +459,33 @@ void RoomThread::actionHulaoPass(ServerPlayer *shenlvbu, QList<ServerPlayer *> l
             room->setCurrent(shenlvbu);
             actionHulaoPass(shenlvbu, league, game_rule, 2);
         } else if (triggerEvent == TurnBroken) {
-            ServerPlayer *player = room->getCurrent();
-            ServerPlayer *next = findHulaoPassNext(shenlvbu, league, stage);
-            if (player->getPhase() != Player::NotActive) {
-                game_rule->trigger(EventPhaseEnd, room, player, QVariant());
-                player->changePhase(player->getPhase(), Player::NotActive);
-                if (player != shenlvbu && stage == 1)
-                    room->setPlayerFlag(player, "actioned");
-            }
-
-            room->setCurrent(next);
-            actionHulaoPass(shenlvbu, league, game_rule, stage);
+            _handleTurnBrokenHulaoPass(shenlvbu, league, game_rule, stage);
         } else {
             throw triggerEvent;
         }
+    }
+}
+
+void RoomThread::_handleTurnBrokenHulaoPass(ServerPlayer *shenlvbu, QList<ServerPlayer *> league, GameRule *game_rule, int stage) {
+    try {
+        ServerPlayer *player = room->getCurrent();
+        trigger(TurnBroken, room, player);
+        ServerPlayer *next = findHulaoPassNext(shenlvbu, league, stage);
+        if (player->getPhase() != Player::NotActive) {
+            game_rule->trigger(EventPhaseEnd, room, player, QVariant());
+            player->changePhase(player->getPhase(), Player::NotActive);
+            if (player != shenlvbu && stage == 1)
+                room->setPlayerFlag(player, "actioned");
+        }
+
+        room->setCurrent(next);
+        actionHulaoPass(shenlvbu, league, game_rule, stage);
+    }
+    catch (TriggerEvent triggerEvent) {
+        if (triggerEvent == TurnBroken)
+            _handleTurnBrokenHulaoPass(shenlvbu, league, game_rule, stage);
+        else
+            throw triggerEvent;
     }
 }
 
@@ -527,19 +498,31 @@ void RoomThread::actionNormal(GameRule *game_rule) {
         }
     }
     catch (TriggerEvent triggerEvent) {
-        if (triggerEvent == TurnBroken) {
-            ServerPlayer *player = room->getCurrent();
-            ServerPlayer *next = player->getNextAlive();
-            if (player->getPhase() != Player::NotActive) {
-                game_rule->trigger(EventPhaseEnd, room, player, QVariant());
-                player->changePhase(player->getPhase(), Player::NotActive);
-            }
-
-            room->setCurrent(next);
-            actionNormal(game_rule);
-        } else {
+        if (triggerEvent == TurnBroken)
+            _handleTurnBrokenNormal(game_rule);
+        else
             throw triggerEvent;
+    }
+}
+
+void RoomThread::_handleTurnBrokenNormal(GameRule *game_rule) {
+    try {
+        ServerPlayer *player = room->getCurrent();
+        trigger(TurnBroken, room, player);
+        ServerPlayer *next = player->getNextAlive();
+        if (player->getPhase() != Player::NotActive) {
+            game_rule->trigger(EventPhaseEnd, room, player, QVariant());
+            player->changePhase(player->getPhase(), Player::NotActive);
         }
+
+        room->setCurrent(next);
+        actionNormal(game_rule);
+    }
+    catch (TriggerEvent triggerEvent) {
+        if (triggerEvent == TurnBroken)
+            _handleTurnBrokenNormal(game_rule);
+        else
+            throw triggerEvent;
     }
 }
 
@@ -553,6 +536,8 @@ void RoomThread::run() {
         game_rule = new GameRule(this);
 
     addTriggerSkill(game_rule);
+    foreach (const TriggerSkill *triggerSkill, Sanguosha->getGlobalTriggerSkills())
+        addTriggerSkill(triggerSkill);
     if (Config.EnableBasara) addTriggerSkill(new BasaraMode(this));
 
     if (room->getScenario() != NULL) {
@@ -561,11 +546,11 @@ void RoomThread::run() {
     }
 
     // start game
-    try {        
-        trigger(GameStart, (Room *)room, NULL);
-        constructTriggerTable();
-        if (room->mode == "06_3v3") {
-            QList<ServerPlayer *> warm, cool;
+    try {
+        QString order;
+        QList<ServerPlayer *> warm, cool;
+        QList<ServerPlayer *> first, second;
+        if (room->getMode() == "06_3v3") {
             foreach (ServerPlayer *player, room->m_players) {
                 switch (player->getRoleEnum()) {
                 case Player::Lord: warm.prepend(player); break;
@@ -574,10 +559,7 @@ void RoomThread::run() {
                 case Player::Rebel: cool.append(player); break;
                 }
             }
-
-            QString order = room->askForOrder(cool.first());
-            QList<ServerPlayer *> first, second;
-
+            order = room->askForOrder(cool.first());
             if (order == "warm") {
                 first = warm;
                 second = cool;
@@ -585,6 +567,10 @@ void RoomThread::run() {
                 first = cool;
                 second = warm;
             }
+        }
+        trigger(GameStart, (Room *)room, NULL);
+        constructTriggerTable();
+        if (room->getMode() == "06_3v3") {
             run3v3(first, second, game_rule, first.first());
         } else if (room->getMode() == "04_1v3") {
             ServerPlayer *shenlvbu = room->getLord();
@@ -594,14 +580,21 @@ void RoomThread::run() {
             room->setCurrent(league.first());
             actionHulaoPass(shenlvbu, league, game_rule, 1);
         } else {
-            if (room->getMode() == "02_1v1")
-                room->setCurrent(room->getPlayers().at(1));
-
+            if (room->getMode() == "02_1v1") {
+                ServerPlayer *first = room->getPlayers().first();
+                if (first->getRole() != "renegade")
+                    first = room->getPlayers().at(1);
+                ServerPlayer *second = first->getNext();
+                trigger(Debut, (Room *)room, first);
+                trigger(Debut, (Room *)room, second);
+                room->setCurrent(first);
+            }
             actionNormal(game_rule);
         }
     }
     catch (TriggerEvent triggerEvent) {
         if (triggerEvent == GameFinished) {
+            terminate();
             Sanguosha->unregisterRoom();
             return;
         } else
@@ -642,11 +635,12 @@ bool RoomThread::trigger(TriggerEvent triggerEvent, Room *room, ServerPlayer *ta
 
         for (int i = 0; i < skills.size(); i++) {
             const TriggerSkill *skill = skills[i];
-            if (skill->triggerable(target) && !triggered.contains(skill)) {
+            if (!triggered.contains(skill) && skill->triggerable(target)) {
                 while (room->isPaused()) {}
                 triggered.append(skill);
                 broken = skill->trigger(triggerEvent, room, target, data);
                 if (broken) break;
+                i = 0;
             }
         }
 
@@ -693,7 +687,20 @@ void RoomThread::addTriggerSkill(const TriggerSkill *skill) {
     foreach (TriggerEvent triggerEvent, events) {
         QList<const TriggerSkill *> &table = skill_table[triggerEvent];
         table << skill;
-        //qStableSort(table.begin(), table.end(), CompareByPriority);
+        foreach (const TriggerSkill *askill, table) {
+            double priority = askill->getPriority();
+            int len = room->getPlayers().length();
+            foreach (ServerPlayer *p, room->getAllPlayers(true)) {
+                if (p->hasSkill(askill->objectName())) {
+                    priority += (double)len / 100;
+                    break;
+                }
+                len--;
+            }
+            TriggerSkill *mutable_skill = const_cast<TriggerSkill *>(askill);
+            mutable_skill->setDynamicPriority(priority);
+        }
+        qStableSort(table.begin(), table.end(), CompareByPriority);
     }
 
     if (skill->isVisible()) {

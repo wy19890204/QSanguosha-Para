@@ -24,7 +24,8 @@ private:
     QStringList unknown_list;
 
     void askForTakeGeneral(ServerPlayer *player);
-    void startArrange(ServerPlayer *player);
+    void startArrange(QList<ServerPlayer *> players);
+    void askForFirstGeneral(QList<ServerPlayer *> players);
 };
 
 #endif

@@ -344,6 +344,10 @@ void Card::addSubcards(const QList<const Card *> &cards) {
         subcards.append(card->getId());
 }
 
+void Card::addSubcards(const QList<int> &subcards_list) {
+    subcards.append(subcards_list);
+}
+
 int Card::subcardsLength() const{
     return subcards.length();
 }
@@ -398,8 +402,7 @@ const Card *Card::Parse(const QString &str) {
         if (card == NULL)
             return NULL;
 
-        foreach (QString subcard_id, subcard_ids)
-            card->addSubcard(subcard_id.toInt());
+        card->addSubcards(StringList2IntList(subcard_ids));
 
         // skill name
         // @todo: This is extremely dirty and would cause endless troubles.
@@ -437,9 +440,7 @@ const Card *Card::Parse(const QString &str) {
         QString copy = str;
         copy.remove(QChar('$'));
         QStringList card_strs = copy.split("+");
-        DummyCard *dummy = new DummyCard;
-        foreach (QString card_str, card_strs)
-            dummy->addSubcard(card_str.toInt());
+        DummyCard *dummy = new DummyCard(StringList2IntList(card_strs));
         dummy->deleteLater();
         return dummy;
     } else if (str.startsWith(QChar('#'))) {
@@ -462,9 +463,7 @@ const Card *Card::Parse(const QString &str) {
             subcard_ids = subcard_str.split("+");
 
         Suit suit = Card::NoSuit;
-        DummyCard *dummy = new DummyCard;
-        foreach (QString subcard_id, subcard_ids)
-            dummy->addSubcard(subcard_id.toInt());
+        DummyCard *dummy = new DummyCard(StringList2IntList(subcard_ids));
         if (suit_string == "to_be_decided")
             suit = dummy->getSuit();
         else
@@ -487,9 +486,7 @@ const Card *Card::Parse(const QString &str) {
         if (card == NULL)
             return NULL;
 
-        foreach (QString subcard_id, subcard_ids)
-            card->addSubcard(subcard_id.toInt());
-
+        card->addSubcards(StringList2IntList(subcard_ids));
         card->setSkillName(m_skillName);
         card->deleteLater();
         return card;
@@ -497,18 +494,37 @@ const Card *Card::Parse(const QString &str) {
         bool ok;
         int card_id = str.toInt(&ok);
         if (ok)
-            return Sanguosha->getCard(card_id);
+            return Sanguosha->getCard(card_id)->getRealCard();
         else
             return NULL;
     }
 }
 
 Card *Card::Clone(const Card *card) {
-    const QMetaObject *meta = card->metaObject();
     Card::Suit suit = card->getSuit();
     int number = card->getNumber();
     
-    QObject *card_obj = meta->newInstance(Q_ARG(Card::Suit, suit), Q_ARG(int, number));
+    QObject *card_obj = NULL;
+    if (card->isKindOf("LuaBasicCard")) {
+        const LuaBasicCard *lcard = qobject_cast<const LuaBasicCard *>(card);
+        Q_ASSERT(lcard != NULL);
+        card_obj = lcard->clone();
+    } else if (card->isKindOf("LuaTrickCard")) {
+        const LuaTrickCard *lcard = qobject_cast<const LuaTrickCard *>(card);
+        Q_ASSERT(lcard != NULL);
+        card_obj = lcard->clone();
+    } else if (card->isKindOf("LuaWeapon")) {
+        const LuaWeapon *lcard = qobject_cast<const LuaWeapon *>(card);
+        Q_ASSERT(lcard != NULL);
+        card_obj = lcard->clone();
+    } else if (card->isKindOf("LuaArmor")) {
+        const LuaArmor *lcard = qobject_cast<const LuaArmor *>(card);
+        Q_ASSERT(lcard != NULL);
+        card_obj = lcard->clone();
+    } else {
+        const QMetaObject *meta = card->metaObject();
+        card_obj = meta->newInstance(Q_ARG(Card::Suit, suit), Q_ARG(int, number));
+    }
     if (card_obj) {
         Card *new_card = qobject_cast<Card *>(card_obj);
         new_card->setId(card->getId());
@@ -588,14 +604,14 @@ void Card::onUse(Room *room, const CardUseStruct &use) const{
     thread->trigger(PreCardUsed, room, player, data);
     card_use = data.value<CardUseStruct>();
  
-    if (getTypeId() != TypeSkill) {
+    if (card_use.card->getTypeId() != TypeSkill) {
         CardMoveReason reason(CardMoveReason::S_REASON_USE, player->objectName(), QString(), card_use.card->getSkillName(), QString());
         if (card_use.to.size() == 1)
             reason.m_targetId = card_use.to.first()->objectName();
-        CardsMoveStruct move(used_cards, card_use.from, NULL, Player::PlaceTable, reason);
+        CardsMoveStruct move(used_cards, card_use.from, NULL, Player::PlaceUnknown, Player::PlaceTable, reason);
         moves.append(move);
         room->moveCardsAtomic(moves, true);
-    } else if (willThrow()) {
+    } else if (card_use.card->willThrow()) {
         CardMoveReason reason(CardMoveReason::S_REASON_THROW, player->objectName(), QString(), card_use.card->getSkillName(), QString());
         room->moveCardTo(this, player, NULL, Player::DiscardPile, reason, true);
     }
@@ -751,7 +767,16 @@ QString SkillCard::toString(bool hidden) const{
 
 DummyCard::DummyCard(): SkillCard() {
     target_fixed = true;
+    handling_method = Card::MethodNone;
     setObjectName("dummy");
+}
+
+DummyCard::DummyCard(const QList<int> &subcards): SkillCard() {
+    target_fixed = true;
+    handling_method = Card::MethodNone;
+    setObjectName("dummy");
+    foreach (int id, subcards)
+        this->subcards.append(id);
 }
 
 QString DummyCard::getType() const{

@@ -127,12 +127,11 @@ private:
     QSpinBox *nullification_spinbox;
     QCheckBox *minimize_dialog_checkbox;
     QCheckBox *ai_enable_checkbox;
-    QCheckBox *role_predictable_checkbox;
-    QCheckBox *ai_chat_checkbox;
     QSpinBox *ai_delay_spinbox;
     QCheckBox *ai_delay_altered_checkbox;
     QSpinBox *ai_delay_ad_spinbox;
     QCheckBox *surrender_at_death_checkbox;
+    QCheckBox *luck_card_checkbox;
     QRadioButton *official_3v3_radiobutton;
     QComboBox *official_3v3_ComboBox;
     QComboBox *role_choose_ComboBox;
@@ -173,7 +172,6 @@ public:
     void daemonize();
     Room *createNewRoom();
     void signupPlayer(ServerPlayer *player);
-    void gamesOver();
 
 private:
     ServerSocket *server;

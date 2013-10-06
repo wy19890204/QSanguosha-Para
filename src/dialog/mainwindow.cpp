@@ -11,7 +11,7 @@
 #include "pixmapanimation.h"
 #include "record-analysis.h"
 
-#include <cmath>
+#include <qmath.h>
 #include <QGraphicsView>
 #include <QGraphicsItem>
 #include <QGraphicsPixmapItem>
@@ -77,6 +77,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(config_dialog, SIGNAL(bg_changed()), this, SLOT(changeBackground()));
 
     connect(ui->actionAbout_Qt, SIGNAL(triggered()), qApp, SLOT(aboutQt()));
+    connect(ui->actionAcknowledgement_2, SIGNAL(triggered()), this, SLOT(on_actionAcknowledgement_triggered()));
 
     StartScene *start_scene = new StartScene;
 
@@ -148,6 +149,7 @@ void MainWindow::on_actionExit_triggered() {
                                    tr("Are you sure to exit?"),
                                    QMessageBox::Ok | QMessageBox::Cancel);
     if (result == QMessageBox::Ok) {
+        delete systray;
         systray = NULL;
         close();
     }
@@ -283,14 +285,12 @@ void MainWindow::enterRoom() {
     if (ServerInfo.EnableCheat) {
         ui->menuCheat->setEnabled(true);
 
-        connect(ui->actionGet_card, SIGNAL(triggered()), ui->actionCard_Overview, SLOT(trigger()));
         connect(ui->actionDeath_note, SIGNAL(triggered()), room_scene, SLOT(makeKilling()));
         connect(ui->actionDamage_maker, SIGNAL(triggered()), room_scene, SLOT(makeDamage()));
         connect(ui->actionRevive_wand, SIGNAL(triggered()), room_scene, SLOT(makeReviving()));
         connect(ui->actionExecute_script_at_server_side, SIGNAL(triggered()), room_scene, SLOT(doScript()));
     } else {
         ui->menuCheat->setEnabled(false);
-        ui->actionGet_card->disconnect();
         ui->actionDeath_note->disconnect();
         ui->actionDamage_maker->disconnect();
         ui->actionRevive_wand->disconnect();
@@ -329,7 +329,6 @@ void MainWindow::gotoStartScene() {
     setCentralWidget(view);
 
     ui->menuCheat->setEnabled(false);
-    ui->actionGet_card->disconnect();
     ui->actionDeath_note->disconnect();
     ui->actionDamage_maker->disconnect();
     ui->actionRevive_wand->disconnect();
@@ -340,6 +339,7 @@ void MainWindow::gotoStartScene() {
     addAction(ui->actionShow_Hide_Menu);
     addAction(ui->actionFullscreen);
 
+    delete systray;
     systray = NULL;
     if (ClientInstance)
         delete ClientInstance;
@@ -350,7 +350,7 @@ void MainWindow::startGameInAnotherInstance() {
 }
 
 void MainWindow::on_actionGeneral_Overview_triggered() {
-    GeneralOverview *overview = new GeneralOverview(this);
+    GeneralOverview *overview = GeneralOverview::getInstance(this);
     overview->fillGenerals(Sanguosha->findChildren<const General *>());
     overview->show();
 }
@@ -596,9 +596,16 @@ void MainWindow::on_actionBroadcast_triggered() {
 }
 
 void MainWindow::on_actionAcknowledgement_triggered() {
-    AcknowledgementScene* ack = new AcknowledgementScene;
-    connect(ack, SIGNAL(go_back()), this, SLOT(gotoStartScene()));
-    if (scene && !scene->inherits("RoomScene")) gotoScene(ack);
+    Window *window = new Window(QString(), QSize(1000, 677), "image/system/acknowledgement.png");
+    scene->addItem(window);
+
+    Button *button = window->addCloseButton(tr("OK"));
+    button->moveBy(-85, -35);
+    window->setZValue(32766);
+    window->shift(scene && scene->inherits("RoomScene") ? scene->width() : 0,
+                  scene && scene->inherits("RoomScene") ? scene->height() : 0);
+
+    window->appear();
 }
 
 void MainWindow::on_actionPC_Console_Start_triggered() {
@@ -623,20 +630,6 @@ void MainWindow::on_actionPC_Console_Start_triggered() {
 #include <QToolButton>
 #include <QCommandLinkButton>
 #include <QFormLayout>
-
-AcknowledgementScene::AcknowledgementScene(QObject *parent)
-    : QGraphicsScene(parent)
-{
-    view = new QDeclarativeView;
-    view->setSource(QUrl::fromLocalFile("acknowledgement/main.qml"));
-    addWidget(view);
-    view->move(-width() / 2, -height() / 2);
-    view->setStyleSheet(QString("background: transparent"));
-
-    QObject *item = view->rootObject();
-    connect(item, SIGNAL(go_back()), this, SIGNAL(go_back()));
-}
-
 #include "recorder.h"
 
 void MainWindow::on_actionReplay_file_convert_triggered() {
@@ -688,13 +681,13 @@ void MainWindow::on_actionRecord_analysis_triggered() {
 
     RecAnalysis *record = new RecAnalysis(filename);
     QMap<QString, PlayerRecordStruct *> record_map = record->getRecordMap();
-    table->setColumnCount(10);
+    table->setColumnCount(11);
     table->setRowCount(record_map.keys().length());
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
 
     static QStringList labels;
     if (labels.isEmpty()) {
-        labels << tr("ScreenName") << tr("General") << tr("Role") << tr("Living") << tr("WinOrLose")
+        labels << tr("ScreenName") << tr("General") << tr("Role") << tr("Living") << tr("WinOrLose") << tr("TurnCount")
                << tr("Recover") << tr("Damage") << tr("Damaged") << tr("Kill") << tr("Designation");
     }
     table->setHorizontalHeaderLabels(labels);
@@ -726,30 +719,34 @@ void MainWindow::on_actionRecord_analysis_triggered() {
         table->setItem(i, 3, item);
 
         item = new QTableWidgetItem;
-        bool is_win = record->getRecordWinners().contains(rec->m_role) ||
-                        record->getRecordWinners().contains(record_map.key(rec));
+        bool is_win = record->getRecordWinners().contains(rec->m_role)
+                      || record->getRecordWinners().contains(record_map.key(rec));
         item->setText(is_win ? tr("Win") : tr("Lose"));
         table->setItem(i, 4, item);
 
         item = new QTableWidgetItem;
-        item->setText(QString::number(rec->m_recover));
+        item->setText(QString::number(rec->m_turnCount));
         table->setItem(i, 5, item);
 
         item = new QTableWidgetItem;
-        item->setText(QString::number(rec->m_damage));
+        item->setText(QString::number(rec->m_recover));
         table->setItem(i, 6, item);
 
         item = new QTableWidgetItem;
-        item->setText(QString::number(rec->m_damaged));
+        item->setText(QString::number(rec->m_damage));
         table->setItem(i, 7, item);
 
         item = new QTableWidgetItem;
-        item->setText(QString::number(rec->m_kill));
+        item->setText(QString::number(rec->m_damaged));
         table->setItem(i, 8, item);
 
         item = new QTableWidgetItem;
-        item->setText(rec->m_designation.join(", "));
+        item->setText(QString::number(rec->m_kill));
         table->setItem(i, 9, item);
+
+        item = new QTableWidgetItem;
+        item->setText(rec->m_designation.join(", "));
+        table->setItem(i, 10, item);
         i++;
     }
 

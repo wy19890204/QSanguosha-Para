@@ -18,12 +18,9 @@ return {
 	["dr_sunquan"] = "龙版孙权",
 	["&dr_sunquan"] = "孙权",
 	["drzhiheng"] = "制衡",
-	[":drzhiheng"] = "结束阶段，你可以弃置任意数量的手牌，然后将手牌数补至等于当前体力值的张数。",
+	[":drzhiheng"] = "结束阶段开始时，你可以弃置任意数量的手牌，然后将手牌数补至等于体力值的张数。",
 	["@drzhiheng-card"] = "你可以发动“制衡”",
 	["~drzhiheng"] = "选择需要弃置的牌→点击确定",
-	["drjiuyuan"] = "救援",
-	[":drjiuyuan"] = "<font color=\"orange\"><b>主公技。</b></font><font color=\"green\"><b>阶段技。</b></font>其他吴势力角色的出牌阶段，该角色可以交给你一张手牌。",
-	["drjiuyuanv"] = "救援送牌",
 
 	["#dr_zhouyu"] = "大都督",
 	["dr_zhouyu"] = "龙版周瑜",
@@ -35,7 +32,7 @@ return {
 	["dr_lvbu"] = "龙版吕布",
 	["&dr_lvbu"] = "吕布",
 	["drwushuang"] = "无双",
-	[":drwushuang"] = "<font color=\"blue\"><b>锁定技。</b></font>每当你指定【杀】的目标后，目标角色须连续使用两张【闪】抵消此【杀】。一名角色响应你使用的【南蛮入侵】或【万箭齐发】时，须额外弃置一张牌。",
+	[":drwushuang"] = "<font color=\"blue\"><b>锁定技。</b></font>每当你指定【杀】的目标后，目标角色须连续使用两张【闪】抵消此【杀】。一名角色响应你使用的【南蛮入侵】或【万箭齐发】时，须先弃置一张牌。",
 
 	["#dr_huatuo"] = "神医",
 	["dr_huatuo"] = "龙版华佗",

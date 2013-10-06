@@ -26,16 +26,31 @@ QVariant GetValueFromLuaState(lua_State *L, const char *table_name, const char *
             break;
         }
     case LUA_TTABLE: {
-            QStringList list;
+            lua_rawgeti(L, -1, 1);
+            bool isArray = !lua_isnil(L, -1);
+            lua_pop(L, 1);
 
-            size_t size = lua_rawlen(L, -1);
-            for (size_t i = 0; i < size; i++) {
-                lua_rawgeti(L, -1, i + 1);
-                QString element = QString::fromUtf8(lua_tostring(L, -1));
-                lua_pop(L, 1);
-                list << element;
+            if (isArray) {
+                QStringList list;
+
+                size_t size = lua_rawlen(L, -1);
+                for (size_t i = 0; i < size; i++) {
+                    lua_rawgeti(L, -1, i + 1);
+                    QString element = QString::fromUtf8(lua_tostring(L, -1));
+                    lua_pop(L, 1);
+                    list << element;
+                }
+                data = list;
+            } else {
+                QVariantMap map;
+                int t = lua_gettop(L);
+                for (lua_pushnil(L); lua_next(L, t); lua_pop(L, 1)) {
+                    const char *key = lua_tostring(L, -2);
+                    const char *value = lua_tostring(L, -1);
+                    map[key] = value;
+                }
+                data = map;
             }
-            data = list;
         }
     default:
         break;
@@ -62,12 +77,6 @@ void DoLuaScript(lua_State *L, const char *script) {
     }
 }
 
-void DoLuaScripts(lua_State *L, const QStringList &scripts) {
-    foreach (QString script, scripts) {
-        DoLuaScript(L, script.toLocal8Bit());
-    }
-}
-
 QStringList IntList2StringList(const QList<int> &intlist) {
     QStringList stringlist;
     for (int i = 0; i < intlist.size(); i++)
@@ -79,6 +88,24 @@ QList<int> StringList2IntList(const QStringList &stringlist) {
     QList<int> intlist;
     for (int i = 0; i < stringlist.size(); i++) {
         QString n = stringlist.at(i);
+        bool ok;
+        intlist.append(n.toInt(&ok));
+        if (!ok) return QList<int>();
+    }
+    return intlist;
+}
+
+QVariantList IntList2VariantList(const QList<int> &intlist) {
+    QVariantList variantlist;
+    for (int i = 0; i < intlist.size(); i++)
+        variantlist.append(QVariant(intlist.at(i)));
+    return variantlist;
+}
+
+QList<int> VariantList2IntList(const QVariantList &variantlist) {
+    QList<int> intlist;
+    for (int i = 0; i < variantlist.size(); i++) {
+        QVariant n = variantlist.at(i);
         bool ok;
         intlist.append(n.toInt(&ok));
         if (!ok) return QList<int>();

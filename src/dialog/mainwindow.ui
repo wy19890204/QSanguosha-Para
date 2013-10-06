@@ -20,7 +20,7 @@
      <x>0</x>
      <y>0</y>
      <width>600</width>
-     <height>23</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuGame">
@@ -64,6 +64,8 @@
     <addaction name="actionAbout_Lua"/>
     <addaction name="actionAbout_fmod"/>
     <addaction name="separator"/>
+    <addaction name="actionAcknowledgement_2"/>
+    <addaction name="separator"/>
     <addaction name="actionRole_assign_table"/>
    </widget>
    <widget class="QMenu" name="menuView">
@@ -81,7 +83,6 @@
     <property name="title">
      <string>Cheat</string>
     </property>
-    <addaction name="actionGet_card"/>
     <addaction name="actionDamage_maker"/>
     <addaction name="actionDeath_note"/>
     <addaction name="actionRevive_wand"/>
@@ -279,14 +280,6 @@
     <string>Expand dashboard</string>
    </property>
   </action>
-  <action name="actionGet_card">
-   <property name="enabled">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Get card ...</string>
-   </property>
-  </action>
   <action name="actionDeath_note">
    <property name="text">
     <string>Death note ...</string>
@@ -372,6 +365,11 @@
    </property>
    <property name="text">
     <string>Never nullify my trick</string>
+   </property>
+  </action>
+  <action name="actionAcknowledgement_2">
+   <property name="text">
+    <string>Acknowledgement</string>
    </property>
   </action>
  </widget>

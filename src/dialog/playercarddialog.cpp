@@ -15,8 +15,9 @@ PlayerCardButton::PlayerCardButton(const QString &name)
 {
 }
 
-PlayerCardDialog::PlayerCardDialog(const ClientPlayer *player, const QString &flags, bool handcard_visible)
-    : player(player), handcard_visible(handcard_visible)
+PlayerCardDialog::PlayerCardDialog(const ClientPlayer *player, const QString &flags,
+                                   bool handcard_visible, Card::HandlingMethod method, QList<int> &disabled_ids)
+    : player(player), handcard_visible(handcard_visible), method(method), disabled_ids(disabled_ids)
 {
     QVBoxLayout *vlayout1 = new QVBoxLayout, *vlayout2 = new QVBoxLayout;
     QHBoxLayout *layout = new QHBoxLayout;
@@ -104,6 +105,7 @@ QWidget *PlayerCardDialog::createHandcardButton() {
         button->setEnabled(false);
     } else {
         button->setDescription(tr("This guy has %1 hand card(s)").arg(num));
+        button->setEnabled(method != Card::MethodDiscard || Self->canDiscard(player, "h"));
         mapper.insert(button, -1);
         connect(button, SIGNAL(clicked()), this, SLOT(emitId()));
     }
@@ -119,7 +121,8 @@ QWidget *PlayerCardDialog::createEquipArea() {
     if (weapon) {
         PlayerCardButton *button = new PlayerCardButton(weapon->getFullName());
         button->setIcon(G_ROOM_SKIN.getCardSuitPixmap(Sanguosha->getEngineCard(weapon->getId())->getSuit()));
-
+        button->setEnabled(!disabled_ids.contains(weapon->getEffectiveId())
+                           && (method != Card::MethodDiscard || Self->canDiscard(player, weapon->getEffectiveId())));
         mapper.insert(button, weapon->getId());
         connect(button, SIGNAL(clicked()), this, SLOT(emitId()));
         layout->addWidget(button);
@@ -129,7 +132,8 @@ QWidget *PlayerCardDialog::createEquipArea() {
     if (armor) {
         PlayerCardButton *button = new PlayerCardButton(armor->getFullName());
         button->setIcon(G_ROOM_SKIN.getCardSuitPixmap(Sanguosha->getEngineCard(armor->getId())->getSuit()));
-
+        button->setEnabled(!disabled_ids.contains(armor->getEffectiveId())
+                           && (method != Card::MethodDiscard || Self->canDiscard(player, armor->getEffectiveId())));
         mapper.insert(button, armor->getId());
         connect(button, SIGNAL(clicked()), this, SLOT(emitId()));
         layout->addWidget(button);
@@ -139,7 +143,8 @@ QWidget *PlayerCardDialog::createEquipArea() {
     if (horse) {
         PlayerCardButton *button = new PlayerCardButton(horse->getFullName() + tr("(+1 horse)"));
         button->setIcon(G_ROOM_SKIN.getCardSuitPixmap(Sanguosha->getEngineCard(horse->getId())->getSuit()));
-
+        button->setEnabled(!disabled_ids.contains(horse->getEffectiveId())
+                           && (method != Card::MethodDiscard || Self->canDiscard(player, horse->getEffectiveId())));
         mapper.insert(button, horse->getId());
         connect(button, SIGNAL(clicked()), this, SLOT(emitId()));
         layout->addWidget(button);
@@ -149,7 +154,8 @@ QWidget *PlayerCardDialog::createEquipArea() {
     if (horse) {
         PlayerCardButton *button = new PlayerCardButton(horse->getFullName() + tr("(-1 horse)"));
         button->setIcon(G_ROOM_SKIN.getCardSuitPixmap(Sanguosha->getEngineCard(horse->getId())->getSuit()));
-
+        button->setEnabled(!disabled_ids.contains(horse->getEffectiveId())
+                           && (method != Card::MethodDiscard || Self->canDiscard(player, horse->getEffectiveId())));
         mapper.insert(button, horse->getId());
         connect(button, SIGNAL(clicked()), this, SLOT(emitId()));
         layout->addWidget(button);
@@ -175,7 +181,8 @@ QWidget *PlayerCardDialog::createJudgingArea() {
         PlayerCardButton *button = new PlayerCardButton(real->getFullName());
         button->setIcon(G_ROOM_SKIN.getCardSuitPixmap(real->getSuit()));
         layout->addWidget(button);
-
+        button->setEnabled(!disabled_ids.contains(card->getEffectiveId())
+                           && (method != Card::MethodDiscard || Self->canDiscard(player, card->getEffectiveId())));
         mapper.insert(button, card->getId());
         connect(button, SIGNAL(clicked()), this, SLOT(emitId()));
     }

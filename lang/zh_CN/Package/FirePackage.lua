@@ -18,7 +18,7 @@ return {
 	["dianwei"] = "典韦",
 	["illustrator:dianwei"] = "小冷",
 	["qiangxi"] = "强袭",
-	[":qiangxi"] = "<font color=\"green\"><b>阶段技。</b></font>你可以失去1点体力或弃置一张武器牌并选择一名攻击范围内的角色：若如此做，你对该角色造成1点伤害。",
+	[":qiangxi"] = "<font color=\"green\"><b>阶段技。</b></font>你可以失去1点体力或弃置一张武器牌，并选择攻击范围内的一名其他角色：若如此做，你对该角色造成1点伤害。",
 
 	["#wolong"] = "卧龙",
 	["wolong"] = "卧龙诸葛亮",
@@ -36,7 +36,7 @@ return {
 	["lianhuan"] = "连环",
 	[":lianhuan"] = "你可以将一张♣手牌当【铁索连环】使用或重铸。",
 	["niepan"] = "涅槃",
-	[":niepan"] = "<font color=\"red\"><b>限定技。</b></font>当你处于濒死状态时，你可以弃置你区域里的牌，将武将牌翻至正面朝上并重置之，然后回复至3点体力。",
+	[":niepan"] = "<font color=\"red\"><b>限定技。</b></font>每当你处于濒死状态时，你可以弃置你区域里的牌，将武将牌恢复至初始状态，然后摸三张牌并回复至3点体力。",
 	["$NiepanAnimate"] = "image=image/animate/niepan.png",
 	["@nirvana"] = "涅槃",
 
@@ -44,7 +44,7 @@ return {
 	["taishici"] = "太史慈",
 	["illustrator:taishici"] = "Tuu.",
 	["tianyi"] = "天义",
-	[":tianyi"] = "<font color=\"green\"><b>阶段技。</b></font>你可以与一名其他角色拼点：若你赢，你拥有以下技能：本回合你可以额外使用一张【杀】，你使用【杀】可以额外选择一名目标且无距离限制；若你没赢，你不能使用【杀】，直到回合结束。",
+	[":tianyi"] = "<font color=\"green\"><b>阶段技。</b></font>你可以与一名其他角色拼点：若你赢，本回合，你可以额外使用一张【杀】，你使用【杀】可以额外选择一名目标且无距离限制；若你没赢，你不能使用【杀】，直到回合结束。",
 
 	["#yuanshao"] = "高贵的名门",
 	["yuanshao"] = "袁绍",
@@ -52,13 +52,13 @@ return {
 	["luanji"] = "乱击",
 	[":luanji"] = "你可以将两张相同花色的手牌当【万箭齐发】使用。",
 	["xueyi"] = "血裔",
-	[":xueyi"] = "<font color=\"orange\"><b>主公技。</b></font><font color=\"blue\"><b>锁定技。</b></font>场上每有一名存活的其他群雄角色，你的手牌上限+2。",
+	[":xueyi"] = "<font color=\"orange\"><b>主公技。</b></font><font color=\"blue\"><b>锁定技。</b></font>你的手牌上限+2X。（X为其他群雄角色的数量）",
 
 	["#yanliangwenchou"] = "虎狼兄弟",
 	["yanliangwenchou"] = "颜良＆文丑",
 	["&yanliangwenchou"] = "颜良文丑",
 	["shuangxiong"] = "双雄",
-	[":shuangxiong"] = "摸牌阶段，你可以放弃摸牌并进行一次判定：若如此做，你获得此判定牌，你可以将与此判定牌颜色不同的牌当【决斗】使用，直到回合结束。",
+	[":shuangxiong"] = "摸牌阶段，你可以放弃摸牌并进行判定：若如此做，你获得此判定牌，本回合你可以将与此判定牌颜色不同的牌当【决斗】使用。",
 
 	["#pangde"] = "人马一体",
 	["pangde"] = "庞德",

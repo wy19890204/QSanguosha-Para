@@ -51,8 +51,12 @@ public:
     bool AlterAIDelayAD;
     int AIDelayAD;
     bool SurrenderAtDeath;
+    bool EnableLuckCard;
     ushort ServerPort;
     bool DisableLua;
+
+    QStringList ExtraHiddenGenerals;
+    QStringList RemovedHiddenGenerals;
 
     // client side
     QString HostAddress;

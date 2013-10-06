@@ -10,7 +10,7 @@
 #include <QFile>
 
 Skill::Skill(const QString &name, Frequency frequency)
-    : frequency(frequency), default_choice("no"), attached_lord_skill(false)
+    : frequency(frequency), limit_mark(QString()), default_choice("no"), attached_lord_skill(false)
 {
     static QChar lord_symbol('$');
 
@@ -48,7 +48,7 @@ QString Skill::getNotice(int index) const{
 }
 
 bool Skill::isVisible() const{
-    return !objectName().startsWith("#");
+    return !objectName().startsWith("#") && !inherits("SPConvertSkill");
 }
 
 QString Skill::getDefaultChoice(ServerPlayer *) const{
@@ -108,6 +108,10 @@ Skill::Frequency Skill::getFrequency() const{
     return frequency;
 }
 
+QString Skill::getLimitMark() const{
+    return limit_mark;
+}
+
 QStringList Skill::getSources() const{
     return sources;
 }
@@ -117,7 +121,7 @@ QDialog *Skill::getDialog() const{
 }
 
 ViewAsSkill::ViewAsSkill(const QString &name)
-    : Skill(name)
+    : Skill(name), response_pattern(QString())
 {
 }
 
@@ -136,10 +140,12 @@ bool ViewAsSkill::isAvailable(const Player *invoker,
 }
 
 bool ViewAsSkill::isEnabledAtPlay(const Player *) const{
-    return true;
+    return response_pattern.isEmpty();
 }
 
-bool ViewAsSkill::isEnabledAtResponse(const Player *, const QString &) const{
+bool ViewAsSkill::isEnabledAtResponse(const Player *, const QString &pattern) const{
+    if (!response_pattern.isEmpty())
+        return pattern == response_pattern;
     return false;
 }
 
@@ -179,12 +185,25 @@ bool ZeroCardViewAsSkill::viewFilter(const QList<const Card *> &, const Card *) 
 }
 
 OneCardViewAsSkill::OneCardViewAsSkill(const QString &name)
-    : ViewAsSkill(name)
+    : ViewAsSkill(name), filter_pattern(QString())
 {
 }
 
 bool OneCardViewAsSkill::viewFilter(const QList<const Card *> &selected, const Card *to_select) const{
     return selected.isEmpty() && !to_select->hasFlag("using") && viewFilter(to_select);
+}
+
+bool OneCardViewAsSkill::viewFilter(const Card *to_select) const{
+    if (!inherits("FilterSkill") && !filter_pattern.isEmpty()) {
+        QString pat = filter_pattern;
+        if (pat.endsWith("!")) {
+            if (Self->isJilei(to_select)) return false;
+            pat.chop(1);
+        }
+        ExpPattern pattern(pat);
+        return pattern.match(Self, to_select);
+    }
+    return false;
 }
 
 const Card *OneCardViewAsSkill::viewAs(const QList<const Card *> &cards) const{
@@ -201,7 +220,7 @@ FilterSkill::FilterSkill(const QString &name)
 }
 
 TriggerSkill::TriggerSkill(const QString &name)
-    : Skill(name), view_as_skill(NULL), dynamic_priority(0.0)
+    : Skill(name), view_as_skill(NULL), global(false), dynamic_priority(0.0)
 {
 }
 
@@ -214,12 +233,7 @@ QList<TriggerEvent> TriggerSkill::getTriggerEvents() const{
 }
 
 int TriggerSkill::getPriority() const{
-    switch (frequency) {
-    case Wake:
-            return 3;
-    default:
-            return 2;
-    }
+    return (frequency == 3) ? 3 : 2;
 }
 
 bool TriggerSkill::triggerable(const ServerPlayer *target) const{
@@ -248,9 +262,7 @@ MasochismSkill::MasochismSkill(const QString &name)
 
 bool MasochismSkill::trigger(TriggerEvent, Room *, ServerPlayer *player, QVariant &data) const{
     DamageStruct damage = data.value<DamageStruct>();
-
-    if (player->isAlive())
-        onDamaged(player, damage);
+    onDamaged(player, damage);
 
     return false;
 }
@@ -297,7 +309,7 @@ SPConvertSkill::SPConvertSkill(const QString &from, const QString &to)
 bool SPConvertSkill::triggerable(const ServerPlayer *target) const{
     if (target == NULL) return false;
     if (!Config.value("EnableSPConvert", true).toBool()) return false;
-    if (Config.value("EnableHidden", false).toBool()) return false;
+    if (Config.EnableHegemony) return false;
     if (!isNormalGameMode(Config.GameMode)) return false;
     bool available = false;
     foreach (QString to_gen, to_list) {
@@ -313,16 +325,18 @@ bool SPConvertSkill::triggerable(const ServerPlayer *target) const{
 }
 
 void SPConvertSkill::onGameStart(ServerPlayer *player) const{
-    QVariant data = "convert";
+    Room *room = player->getRoom();
+    QStringList choicelist;
+    foreach (QString to_gen, to_list) {
+        const General *gen = Sanguosha->getGeneral(to_gen);
+        if (gen && !Config.value("Banlist/Roles", "").toStringList().contains(to_gen)
+            && !Sanguosha->getBanPackages().contains(gen->getPackage()))
+            choicelist << to_gen;
+    }
+    QString data = choicelist.join("\\,\\");
+    if (choicelist.length() >= 2)
+        data.replace("\\,\\" + choicelist.last(), "\\or\\" + choicelist.last());
     if (player->askForSkillInvoke(objectName(), data)) {
-        Room *room = player->getRoom();
-        QStringList choicelist;
-        foreach (QString to_gen, to_list) {
-            const General *gen = Sanguosha->getGeneral(to_gen);
-            if (gen && !Config.value("Banlist/Roles", "").toStringList().contains(to_gen)
-                && !Sanguosha->getBanPackages().contains(gen->getPackage()))
-                choicelist << to_gen;
-        }
         QString to_cv;
         AI *ai = player->getAI();
         if (ai)
@@ -341,17 +355,9 @@ void SPConvertSkill::onGameStart(ServerPlayer *player) const{
 
         const General *general = Sanguosha->getGeneral(to_cv);
         const QString kingdom = general->getKingdom();
-        if (!isSecondaryHero && kingdom != player->getKingdom())
+        if (!isSecondaryHero && kingdom != "god" && kingdom != player->getKingdom())
             room->setPlayerProperty(player, "kingdom", kingdom);
     }
-}
-
-QString SPConvertSkill::getFromName() const{
-    return from;
-}
-
-QStringList SPConvertSkill::getToName() const{
-    return to_list;
 }
 
 ProhibitSkill::ProhibitSkill(const QString &name)
@@ -367,6 +373,14 @@ DistanceSkill::DistanceSkill(const QString &name)
 MaxCardsSkill::MaxCardsSkill(const QString &name)
     : Skill(name, Skill::Compulsory)
 {
+}
+
+int MaxCardsSkill::getExtra(const Player *) const{
+    return 0;
+}
+
+int MaxCardsSkill::getFixed(const Player *) const{
+    return -1;
 }
 
 TargetModSkill::TargetModSkill(const QString &name)
