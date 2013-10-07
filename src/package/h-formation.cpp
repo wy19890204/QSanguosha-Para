@@ -28,7 +28,16 @@ public:
             if (!player->isAlive()) break;
             if (dengai->getPile("field").isEmpty()) continue;
             if (!room->askForSkillInvoke(dengai, objectName(), data)) continue;
-            room->obtainCard(player, room->askForAG(dengai, dengai->getPile("field"), false, objectName()));
+            int id = room->askForAG(dengai, dengai->getPile("field"), false, objectName());
+            if (player == dengai) {
+                LogMessage log;
+                log.type = "$MoveCard";
+                log.from = player;
+                log.to << player;
+                log.card_str = QString::number(id);
+                room->sendLog(log);
+            }
+            room->obtainCard(player, id);
         }
         return false;
     }
@@ -305,7 +314,7 @@ public:
 
     virtual bool trigger(TriggerEvent, Room *room, ServerPlayer *player, QVariant &data) const{
         CardsMoveOneTimeStruct move = data.value<CardsMoveOneTimeStruct>();
-        if (move.from && move.from->getPhase() == Player::NotActive
+        if (move.from && move.from->isAlive() && move.from->getPhase() == Player::NotActive
             && move.from_places.contains(Player::PlaceHand) && move.is_last_handcard) {
             if (room->askForSkillInvoke(player, objectName(), data)) {
                 if (move.from == player || room->askForChoice(player, objectName(), "accept+reject") == "accept") {

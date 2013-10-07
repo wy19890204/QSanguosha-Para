@@ -75,7 +75,6 @@ void GameRule::onPhaseProceed(ServerPlayer *player) const{
             break;
         }
     case Player::Play: {
-            room->addPlayerHistory(player, ".");
             while (player->isAlive()) {
                 CardUseStruct card_use;
                 room->activate(player, card_use);
@@ -192,6 +191,8 @@ bool GameRule::trigger(TriggerEvent triggerEvent, Room *room, ServerPlayer *play
             if (change.to == Player::NotActive) {
                 room->setPlayerFlag(player, ".");
                 room->clearPlayerCardLimitation(player, true);
+            } else if (change.to == Player::Play) {
+                room->addPlayerHistory(player, ".");
             }
             break;
         }
@@ -997,13 +998,6 @@ void BasaraMode::generalShowed(ServerPlayer *player, QString general_name) const
     QStringList names = room->getTag(player->objectName()).toStringList();
     if (names.isEmpty()) return;
 
-    LogMessage log;
-    log.type = "#BasaraReveal";
-    log.from = player;
-    log.arg  = player->getGeneralName();
-    log.arg2 = player->getGeneral2Name();
-    room->sendLog(log);
-
     if (player->getGeneralName() == "anjiang") {
         room->changeHero(player, general_name, false, false, false, false);
         room->setPlayerProperty(player, "kingdom", player->getGeneral()->getKingdom());
@@ -1029,6 +1023,13 @@ void BasaraMode::generalShowed(ServerPlayer *player, QString general_name) const
 
     names.removeOne(general_name);
     room->setTag(player->objectName(), QVariant::fromValue(names));
+
+    LogMessage log;
+    log.type = "#BasaraReveal";
+    log.from = player;
+    log.arg  = player->getGeneralName();
+    log.arg2 = player->getGeneral2Name();
+    room->sendLog(log);
 }
 
 bool BasaraMode::trigger(TriggerEvent triggerEvent, Room *room, ServerPlayer *player, QVariant &data) const{
